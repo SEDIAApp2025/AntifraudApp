@@ -15,7 +15,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.example.myapplication.ui.theme.MyApplicationTheme
-import okhttp3.OkHttpClient
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
@@ -35,51 +36,58 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun ApiTestScreen(modifier: Modifier = Modifier) {
+    val gson = Gson()
 
     LaunchedEffect(Unit) {
-        // The new API token from your screenshot
-        val apiToken = "cMR52aectW6PpYRZZEnXeSBBrLK3rNnBEvwuzXxVXTL9gTTRRinqG4q6oFx7WTSYw7smSUXsKWx956WipXbvCKB9JncoPWUtdYw9"
-
-        // Create an OkHttp client with an interceptor to add the x-api-key header
-        val okHttpClient = OkHttpClient.Builder()
-            .addInterceptor { chain ->
-                val original = chain.request()
-                val requestBuilder = original.newBuilder()
-                    .header("x-api-key", apiToken) // Use the correct header key: x-api-key
-                    .method(original.method, original.body)
-
-                val request = requestBuilder.build()
-                chain.proceed(request)
-            }
-            .build()
-
-        // Configure Retrofit with the new base URL and the custom OkHttp client
         val retrofit = Retrofit.Builder()
-            .baseUrl("https://antifraud-gateway.lyc-dev.workers.dev/") // New base URL
-            .client(okHttpClient)
+            .baseUrl("https://antifraud-gateway.lyc-dev.workers.dev/")
             .addConverterFactory(GsonConverterFactory.create())
             .build()
 
-        // Create an instance of our new API interface
         val antiFraudApi = retrofit.create(AntiFraudApi::class.java)
 
         try {
-            // Call the API
-            val reports: List<FraudReport> = antiFraudApi.getData()
+            val response = antiFraudApi.getData(
+                BuildConfig.CLOUDFLARE_API_KEY,
+                    phoneNumber = "0987064507079"
+                )
 
-            // Log the result to the console (Logcat)
-            Log.d("AntiFraudApi", "Successfully fetched ${reports.size} reports.")
-            reports.forEachIndexed { index, report ->
-                Log.d("AntiFraudApi", "Report #${index + 1}: $report")
+            if (response.success) {
+                Log.d("AntiFraudApi", "Success! Version: ${response.version}")
+                
+                val jsonData = response.data
+                
+                when {
+                    // 判斷是否為陣列 []
+                    jsonData.isJsonArray -> {
+                        val listType = object : TypeToken<List<FraudReport>>() {}.type
+                        val reports: List<FraudReport> = gson.fromJson(jsonData, listType)
+                        
+                        Log.d("AntiFraudApi", "檢測到【多筆資料】，共 ${reports.size} 筆")
+                        reports.forEachIndexed { index, report ->
+                            Log.d("AntiFraudApi", " -> [#${index + 1}] $report")
+                        }
+                    }
+                    // 判斷是否為單一物件 {}
+                    jsonData.isJsonObject -> {
+                        val report: FraudReport = gson.fromJson(jsonData, FraudReport::class.java)
+                        Log.d("AntiFraudApi", "檢測到【單筆資料】: $report")
+                    }
+                    // 其他情況 (例如 null 或字串)
+                    else -> {
+                        Log.d("AntiFraudApi", "收到的資料格式非物件也非陣列: $jsonData")
+                    }
+                }
+            } else {
+                Log.e("AntiFraudApi", "API returned success=false")
             }
 
         } catch (e: Exception) {
-            Log.e("AntiFraudApi", "Error fetching data", e)
+            Log.e("AntiFraudApi", "Failed to fetch data: ${e.message}", e)
         }
     }
 
-    // Simple UI to show that the app is running
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text("Fetching data... Check Logcat for results.")
+        Text("Enhanced API Test Running... \nChecking for Object vs Array")
     }
 }
