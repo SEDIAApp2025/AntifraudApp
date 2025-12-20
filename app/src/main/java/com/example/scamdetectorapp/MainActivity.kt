@@ -3,271 +3,514 @@ package com.example.scamdetectorapp
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.Message
-import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.colorResource // 匯入這個來讀取 XML 顏色
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.navigation.NavHostController
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
-import com.example.scamdetector.ui.theme.ScamDetectorTheme
-
+import kotlinx.coroutines.delay
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Message
+import androidx.compose.material.icons.automirrored.outlined.Message
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            ScamDetectorTheme {
-                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    MainScreen()
-                }
+            ScamGuardTheme {
+                AppEntry()
             }
         }
     }
 }
 
+// ==================== 1. 主題設定 (讀取 XML Colors) ====================
 @Composable
-fun MainScreen() {
-    val navController = rememberNavController()
-    val tabs = listOf("網址", "電話", "簡訊")
-    val icons = listOf(Icons.Filled.Link, Icons.Filled.Phone, Icons.Default.Message)
+fun ScamGuardTheme(content: @Composable () -> Unit) {
+    // 從 res/values/colors.xml 讀取顏色
+    val darkBackground = colorResource(id = R.color.scam_background)
+    val surfaceCard = colorResource(id = R.color.scam_surface)
+    val primaryBlue = colorResource(id = R.color.scam_primary)
+    val textWhite = colorResource(id = R.color.scam_text_white)
+
+    // 設定 Material Theme 配色
+    MaterialTheme(
+        colorScheme = darkColorScheme(
+            background = darkBackground,
+            surface = surfaceCard,
+            primary = primaryBlue,
+            onBackground = textWhite,
+            onSurface = textWhite
+        )
+    ) {
+        content()
+    }
+}
+
+// ==================== 2. App 入口與閃屏頁邏輯 ====================
+@Composable
+fun AppEntry() {
+    var showSplash by remember { mutableStateOf(true) }
+
+    if (showSplash) {
+        SplashScreen(onFinished = { showSplash = false })
+    } else {
+        MainAppScreen()
+    }
+}
+
+@Composable
+fun SplashScreen(onFinished: () -> Unit) {
+    val darkBg = colorResource(R.color.scam_background)
+    val primaryColor = colorResource(R.color.scam_primary)
+    val textColor = colorResource(R.color.scam_text_white)
+    val textGrey = colorResource(R.color.scam_text_grey)
+
+    LaunchedEffect(Unit) {
+        delay(2000)
+        onFinished()
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Brush.verticalGradient(listOf(Color(0xFF0F172A), darkBg))),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                imageVector = Icons.Outlined.Shield,
+                contentDescription = "Logo",
+                tint = primaryColor,
+                modifier = Modifier.size(80.dp)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                "SCAM GUARD",
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 2.sp,
+                color = textColor
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Real Time Protection", color = textGrey, fontSize = 14.sp)
+            Spacer(modifier = Modifier.height(48.dp))
+            CircularProgressIndicator(color = primaryColor, modifier = Modifier.size(32.dp))
+        }
+    }
+}
+
+// ==================== 3. 主程式 (含底部導覽) ====================
+@Composable
+fun MainAppScreen() {
+    var currentTab by remember { mutableStateOf("簡訊") }
+    // 直接使用 Theme 裡的背景色
+    val backgroundColor = MaterialTheme.colorScheme.background
 
     Scaffold(
+        containerColor = backgroundColor,
         bottomBar = {
-            NavigationBar {
-                tabs.forEachIndexed { index, title ->
-                    NavigationBarItem(
-                        icon = { Icon(icons[index], contentDescription = title) },
-                        label = { Text(title) },
-                        selected = false, // 這裡簡化，實際可用狀態管理
-                        onClick = { navController.navigate(title) }
-                    )
-                }
-            }
+            CustomBottomBar(currentTab) { selected -> currentTab = selected }
         }
     ) { innerPadding ->
-        NavHost(navController = navController, startDestination = "簡訊", modifier = Modifier.padding(innerPadding)) {
-            composable("網址") { UrlDetectionScreen() }
-            composable("電話") { PhoneDetectionScreen() }
-            composable("簡訊") { SmsDetectionScreen() }
+        Box(modifier = Modifier.padding(innerPadding)) {
+            when (currentTab) {
+                "網址" -> GenericDetectionFlow(
+                    title = "檢測詐騙網址",
+                    placeholder = "貼上網址，例如 https://...",
+                    desc = "支援檢查釣魚網站、假冒連結",
+                    keyboardType = KeyboardType.Uri
+                )
+                "電話" -> GenericDetectionFlow(
+                    title = "檢測詐騙電話",
+                    placeholder = "輸入電話號碼 (如 0912...)",
+                    desc = "檢查常見詐騙客服、假警方電話",
+                    keyboardType = KeyboardType.Phone
+                )
+                "簡訊" -> GenericDetectionFlow(
+                    title = "檢測詐騙簡訊",
+                    placeholder = "貼上簡訊內容...",
+                    desc = "分析關鍵字、假連結、催款語法",
+                    keyboardType = KeyboardType.Text,
+                    isMultiLine = true
+                )
+            }
         }
     }
 }
 
-// ==================== 網址檢測 ====================
 @Composable
-fun UrlDetectionScreen() {
-    var url by remember { mutableStateOf("") }
-    var result by remember { mutableStateOf<Result?>(null) }
+fun CustomBottomBar(currentTab: String, onTabSelected: (String) -> Unit) {
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val greyColor = colorResource(R.color.scam_text_grey)
 
-    DetectionLayout(
-        title = "檢測詐騙網址",
-        placeholder = "貼上網址，例如 https://...",
-        value = url,
-        onValueChange = { url = it },
-        keyboardType = KeyboardType.Uri,
-        onDetect = {
-            // 模擬檢測結果（實際呼叫你的 API）
-            result = Result(
-                isSafe = url.contains("google.com"), // 示範用
-                confidence = if (url.contains("google.com")) 95 else 87,
-                reasons = if (url.contains("google.com")) listOf("知名正規域名")
-                else listOf("可疑重導向", "不在白名單", "相似釣魚域名")
+    NavigationBar(
+        containerColor = surfaceColor,
+        tonalElevation = 8.dp
+    ) {
+        val items = listOf(
+            Triple("網址", Icons.Filled.Public, Icons.Outlined.Public),
+            Triple("電話", Icons.Filled.Phone, Icons.Outlined.Phone),
+            Triple("簡訊", Icons.AutoMirrored.Filled.Message, Icons.AutoMirrored.Outlined.Message)
+        )
+
+        items.forEach { (title, selectedIcon, unselectedIcon) ->
+            val isSelected = currentTab == title
+            NavigationBarItem(
+                selected = isSelected,
+                onClick = { onTabSelected(title) },
+                icon = {
+                    Icon(
+                        imageVector = if (isSelected) selectedIcon else unselectedIcon,
+                        contentDescription = title,
+                        tint = if (isSelected) primaryColor else greyColor
+                    )
+                },
+                label = {
+                    Text(title, color = if (isSelected) primaryColor else greyColor)
+                },
+                colors = NavigationBarItemDefaults.colors(
+                    indicatorColor = Color.Transparent
+                )
             )
-        },
-        result = result,
-        onBack = { result = null }
-    )
+        }
+    }
 }
 
-// ==================== 電話檢測 ====================
+// ==================== 4. 核心檢測流程 ====================
+
+enum class ScreenStep { INPUT, SCANNING, RESULT }
+
+data class ScanResult(
+    val isSafe: Boolean,
+    val score: Int,
+    val title: String,
+    val reasons: List<String>
+)
+
 @Composable
-fun PhoneDetectionScreen() {
-    var phone by remember { mutableStateOf("") }
-    var result by remember { mutableStateOf<Result?>(null) }
-
-    DetectionLayout(
-        title = "檢測詐騙電話",
-        placeholder = "輸入電話號碼，例如 0912345678",
-        value = phone,
-        onValueChange = { phone = it },
-        keyboardType = KeyboardType.Phone,
-        onDetect = {
-            result = Result(
-                isSafe = phone.contains("1234"), // 示範
-                confidence = 80,
-                reasons = if (phone.contains("1234")) listOf("正常號碼")
-                else listOf("常見詐騙客服號碼", "大量負面回報")
-            )
-        },
-        result = result,
-        onBack = { result = null }
-    )
-}
-
-// ==================== 簡訊檢測 ====================
-@Composable
-fun SmsDetectionScreen() {
-    var sms by remember { mutableStateOf("") }
-    var result by remember { mutableStateOf<Result?>(null) }
-
-    DetectionLayout(
-        title = "檢測詐騙簡訊",
-        placeholder = "貼上簡訊內容",
-        value = sms,
-        onValueChange = { sms = it },
-        keyboardType = KeyboardType.Text,
-        multiline = true,
-        onDetect = {
-            result = Result(
-                isSafe = !sms.contains("匯款") && !sms.contains("驗證碼"),
-                confidence = 90,
-                reasons = if (sms.contains("匯款") || sms.contains("驗證碼"))
-                    listOf("包含催款關鍵字", "要求提供驗證碼", "假冒銀行簡訊")
-                else listOf("無可疑關鍵字", "正常語法")
-            )
-        },
-        result = result,
-        onBack = { result = null }
-    )
-}
-
-// ==================== 共用檢測畫面 ====================
-data class Result(val isSafe: Boolean, val confidence: Int, val reasons: List<String>)
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun DetectionLayout(
+fun GenericDetectionFlow(
     title: String,
+    placeholder: String,
+    desc: String,
+    keyboardType: KeyboardType,
+    isMultiLine: Boolean = false
+) {
+    var step by remember { mutableStateOf(ScreenStep.INPUT) }
+    var inputText by remember { mutableStateOf("") }
+    var resultData by remember { mutableStateOf<ScanResult?>(null) }
+    val focusManager = LocalFocusManager.current
+
+    // 模擬檢測邏輯
+    fun startScan() {
+        focusManager.clearFocus()
+        step = ScreenStep.SCANNING
+    }
+
+    LaunchedEffect(step) {
+        if (step == ScreenStep.SCANNING) {
+            delay(2000)
+            val isRisk = inputText.contains("123") || inputText.length > 20
+            resultData = ScanResult(
+                isSafe = !isRisk,
+                score = if (isRisk) 88 else 10,
+                title = if (isRisk) "高風險威脅" else "安全內容",
+                reasons = if (isRisk) listOf("包含黑名單關鍵字", "可疑的發送來源", "急迫性誘導語氣") else listOf("無惡意連結", "正規網域", "無詐騙特徵")
+            )
+            step = ScreenStep.RESULT
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        AnimatedVisibility(visible = step == ScreenStep.INPUT, enter = fadeIn(), exit = fadeOut()) {
+            InputScreen(
+                title = title,
+                desc = desc,
+                placeholder = placeholder,
+                value = inputText,
+                onValueChange = { inputText = it },
+                onScan = { if (inputText.isNotBlank()) startScan() },
+                keyboardType = keyboardType,
+                isMultiLine = isMultiLine
+            )
+        }
+
+        AnimatedVisibility(visible = step == ScreenStep.SCANNING, enter = fadeIn(), exit = fadeOut()) {
+            ScanningScreen(onCancel = { step = ScreenStep.INPUT })
+        }
+
+        AnimatedVisibility(visible = step == ScreenStep.RESULT, enter = fadeIn(), exit = fadeOut()) {
+            resultData?.let {
+                ResultScreen(
+                    originalText = inputText,
+                    result = it,
+                    onBack = {
+                        inputText = ""
+                        step = ScreenStep.INPUT
+                    }
+                )
+            }
+        }
+    }
+}
+
+// ==================== 5. 子畫面實作 ====================
+
+@Composable
+fun InputScreen(
+    title: String,
+    desc: String,
     placeholder: String,
     value: String,
     onValueChange: (String) -> Unit,
+    onScan: () -> Unit,
     keyboardType: KeyboardType,
-    multiline: Boolean = false,
-    onDetect: () -> Unit,
-    result: Result?,
-    onBack: () -> Unit
+    isMultiLine: Boolean
 ) {
-    if (result != null) {
-        // 結果畫面
-        ResultScreen(result = result, originalText = value, onBack = onBack)
-    } else {
-        // 輸入畫面
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(24.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+    val clipboardManager = LocalClipboardManager.current
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val textWhite = MaterialTheme.colorScheme.onBackground
+    val textGrey = colorResource(R.color.scam_text_grey)
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val backgroundColor = MaterialTheme.colorScheme.background
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(modifier = Modifier.height(40.dp))
+        Text(title, fontSize = 28.sp, fontWeight = FontWeight.Bold, color = textWhite)
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(desc, color = textGrey, fontSize = 14.sp, textAlign = TextAlign.Center)
+
+        Spacer(modifier = Modifier.height(40.dp))
+
+        Card(
+            colors = CardDefaults.cardColors(containerColor = surfaceColor),
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth()
         ) {
-            item {
-                Text(title, style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center)
-
-                Spacer(Modifier.height(32.dp))
-
+            Column(modifier = Modifier.padding(16.dp)) {
                 OutlinedTextField(
                     value = value,
                     onValueChange = onValueChange,
-                    placeholder = { Text(placeholder) },
-                    keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-                    singleLine = !multiline,
-                    minLines = if (multiline) 6 else 1,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(Modifier.height(32.dp))
-
-                Button(
-                    onClick = { if (value.isNotBlank()) onDetect() },
-                    enabled = value.isNotBlank(),
+                    placeholder = { Text(placeholder, color = Color.Gray) },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        .height(if (isMultiLine) 150.dp else 60.dp),
+                    // ========== 這裡修正了 ==========
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = primaryColor,
+                        unfocusedBorderColor = Color.Transparent,
+                        focusedTextColor = textWhite,
+                        unfocusedTextColor = textWhite,
+                        focusedContainerColor = backgroundColor,
+                        unfocusedContainerColor = backgroundColor,
+                        disabledContainerColor = backgroundColor,
+                        errorContainerColor = backgroundColor
+                    ),
+                    // ==============================
+                    shape = RoundedCornerShape(12.dp),
+                    keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = ImeAction.Done),
+                    singleLine = !isMultiLine
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedButton(
+                    onClick = {
+                        clipboardManager.getText()?.text?.let { onValueChange(it) }
+                    },
+                    modifier = Modifier.align(Alignment.End),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, primaryColor)
                 ) {
-                    Text("立即檢測", fontSize = 18.sp, color = Color.White)
+                    Icon(Icons.Outlined.ContentPaste, contentDescription = null, tint = primaryColor, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("貼上內容", color = primaryColor)
                 }
             }
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        Button(
+            onClick = onScan,
+            enabled = value.isNotBlank(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            shape = RoundedCornerShape(28.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = primaryColor,
+                disabledContainerColor = surfaceColor
+            )
+        ) {
+            Text("立即檢測", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        }
+        Spacer(modifier = Modifier.height(24.dp))
+    }
+}
+
+@Composable
+fun ScanningScreen(onCancel: () -> Unit) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val textGrey = colorResource(R.color.scam_text_grey)
+
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(120.dp),
+                color = primaryColor,
+                strokeWidth = 8.dp
+            )
+            Icon(Icons.Default.Search, contentDescription = null, tint = primaryColor, modifier = Modifier.size(40.dp))
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+        Text("正在分析威脅...", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+        Text("正在比對雲端詐騙資料庫", fontSize = 14.sp, color = textGrey, modifier = Modifier.padding(top = 8.dp))
+
+        Spacer(modifier = Modifier.height(48.dp))
+        TextButton(onClick = onCancel) {
+            Text("取消", color = textGrey)
         }
     }
 }
 
 @Composable
-fun ResultScreen(result: Result, originalText: String, onBack: () -> Unit) {
-    val riskColor = if (result.isSafe) Color(0xFF388E3C) else Color(0xFFD32F2F)
-    val riskText = if (result.isSafe) "安全" else "高風險"
+fun ResultScreen(originalText: String, result: ScanResult, onBack: () -> Unit) {
+    // 從 XML 讀取顏色
+    val safeColor = colorResource(R.color.scam_safe_green)
+    val riskColor = colorResource(R.color.scam_risk_red)
+    val warningColor = colorResource(R.color.scam_gold_warning)
+    val textWhite = MaterialTheme.colorScheme.onBackground
+    val textGrey = colorResource(R.color.scam_text_grey)
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val backgroundColor = MaterialTheme.colorScheme.background
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(24.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
+    val statusColor = if (result.isSafe) safeColor else riskColor
+    val icon = if (result.isSafe) Icons.Default.CheckCircle else Icons.Default.Warning
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp)
+            .verticalScroll(androidx.compose.foundation.rememberScrollState())
     ) {
-        item {
-            Text(riskText, fontSize = 32.sp, color = riskColor, textAlign = TextAlign.Center)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = textWhite)
+            }
+            Spacer(Modifier.width(8.dp))
+            Text("檢測結果", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = textWhite)
+        }
 
-            LinearProgressIndicator(
-                progress = result.confidence / 100f,
-                color = riskColor,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Text("${result.confidence}% 信心度", textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(24.dp))
 
-            Spacer(Modifier.height(16.dp))
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = surfaceColor),
+            shape = RoundedCornerShape(24.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Column(Modifier.padding(16.dp)) {
-                    Text("檢測說明", fontSize = 18.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-                    Spacer(Modifier.height(8.dp))
-                    result.reasons.forEach {
-                        Row {
-                            Text("• ", color = riskColor)
-                            Text(it)
-                        }
-                    }
-                }
+                Icon(icon, contentDescription = null, tint = statusColor, modifier = Modifier.size(64.dp))
+                Spacer(Modifier.height(16.dp))
+                Text(result.title, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = statusColor)
+                Spacer(Modifier.height(8.dp))
+
+                Text(if(result.isSafe) "安全指數" else "風險指數", color = textGrey, fontSize = 12.sp)
+                Spacer(Modifier.height(8.dp))
+                LinearProgressIndicator(
+                    progress = { result.score / 100f },
+                    color = statusColor,
+                    trackColor = backgroundColor,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                )
+                Text("${result.score}%", color = textWhite, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+            }
+        }
+
+        Spacer(Modifier.height(24.dp))
+
+        Text("分析詳情", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = textWhite)
+        Spacer(Modifier.height(16.dp))
+
+        result.reasons.forEach { reason ->
+            Row(modifier = Modifier.padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Info, contentDescription = null, tint = if(result.isSafe) safeColor else warningColor, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(12.dp))
+                Text(reason, color = textGrey, fontSize = 15.sp)
+            }
+        }
+
+        Spacer(Modifier.height(24.dp))
+
+        Text("原始內容", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = textWhite)
+        Spacer(Modifier.height(8.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(surfaceColor, RoundedCornerShape(12.dp))
+                .padding(16.dp)
+        ) {
+            Text(originalText, color = textGrey, fontSize = 14.sp)
+        }
+
+        Spacer(Modifier.height(32.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Button(
+                onClick = onBack,
+                modifier = Modifier.weight(1f).height(50.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = surfaceColor)
+            ) {
+                Text("再測一次", color = textWhite)
             }
 
-            Spacer(Modifier.height(16.dp))
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            Button(
+                onClick = { },
+                modifier = Modifier.weight(1f).height(50.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = if(result.isSafe) safeColor else riskColor)
             ) {
-                Column(Modifier.padding(16.dp)) {
-                    Text("原始內容", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-                    Spacer(Modifier.height(8.dp))
-                    Text(originalText, color = Color.Gray)
-                }
-            }
-
-            Spacer(Modifier.height(32.dp))
-
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f)) {
-                    Text("再測一次")
-                }
-                Button(
-                    onClick = { /* 回報功能未來實作 */ },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text("回報詐騙")
-                }
+                Text(if(result.isSafe) "完成" else "回報詐騙", color = Color.White)
             }
         }
     }
