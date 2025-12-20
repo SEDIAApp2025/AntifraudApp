@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 深色模式下的主色調（稍微調暗一點） -->
+    <color name="primary">#00695C</color>
+    <color name="primary_dark">#004D40</color>
+    <color name="primary_light">#80CBC4</color>
+    <color name="accent_safe">#80CBC4</color>
+
+    <!-- 警示色保持紅色（深色模式下也看得清楚） -->
+    <color name="danger">#FF5252</color>
+    <color name="safe">#66BB6A</color>
+
+    <!-- 深色背景 -->
+    <color name="background">#FF121212</color>
+    <color name="text_primary">#FFE0E0E0</color>
+</resources>
