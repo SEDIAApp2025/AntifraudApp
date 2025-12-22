@@ -1,77 +1,26 @@
-gitignore
-# =========================================
-# Android Studio & Gradle
-# =========================================
-
-# 自動生成的建置檔案
-/build/
-/.idea/
-/out/# 本機設定檔 (非常重要，包含你個人的 SDK 路徑等資訊)
-/local.properties
-
-# Gradle Wrapper 相關的暫存檔
-/.gradle/
-/gradle/
-/gradlew
-/gradlew.bat
-
-# IDE 工作區檔案
-.idea/workspace.xml
-.idea/libraries/
-.idea/misc.xml
-.idea/modules.xml
-.idea/vcs.xml
-.idea/gradle.xml
-.idea/assetWizardSettings.xml
-.idea/deploymentTargetDropDown.xml
-.idea/dictionaries/
-
-# 各種暫存檔和日誌檔
-*.iml
-*.o
-*.so
 *.log
-*.jar
-*.tmp
 
-# Mac 系統檔案
-.DS_Store
+# Android Studio generated files and folders
+captures/
+.externalNativeBuild/
+.cxx/
+*.aab
+*.apk
+output-metadata.json
 
-# Windows 系統檔案
-Thumbs.db
+# IntelliJ
+*.iml
+.idea/
+misc.xml
+deploymentTargetDropDown.xml
+render.experimental.xml
 
-# 應用程式簽署檔案 (金鑰庫，絕對不能上傳！)
+# Keystore files
 *.jks
 *.keystore
 
-# Google 服務設定檔 (通常透過 CI/CD 或手動加入)
-# 如果你的 google-services.json 包含敏感資訊，也應該忽略它
-# google-services.json
+# Google Services (e.g. APIs or Firebase)
+google-services.json
 
-# 當機報告與分析檔案
-captures/
-.externalNativeBuild/
+# Android Profiling
 *.hprof
-
-# =========================================
-# 模擬器與快照
-# =========================================
-
-# 模擬器快照檔案
-.idea/avd/.DS_Store
-.idea/avd/*.lock
-.idea/avd/*.ini
-.idea/avd/*.iso
-.idea/avd/*.img
-.idea/avd/*.qcow2
-.idea/avd/hardware-qemu.ini.lock
-.idea/avd/sdcard.img.lock
-
-# =========================================
-# Kotlin
-# =========================================
-
-# Kotlin 編譯暫存
-/captures/
-.kotlin/
-
