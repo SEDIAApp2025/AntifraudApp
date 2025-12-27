@@ -5,4 +5,7 @@ data class ScanResult(
     val description: String? = null,
     val threatType: String? = null,
     val suggestion: String? = null
-)
+) {
+    val isRisk: Boolean
+        get() = !riskLevel.equals("UNKNOWN", ignoreCase = true) && !riskLevel.equals("LOW", ignoreCase = true)
+}

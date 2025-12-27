@@ -27,9 +27,20 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // 2. 定義 BuildConfig 欄位
-        // 注意：這裡的值必須包含引號，所以用了 "\"..."\"
-        buildConfigField("String", "CLOUDFLARE_API_KEY", "\"${localProperties.getProperty("CLOUDFLARE_API_KEY") ?: ""}\"")
+        externalNativeBuild {
+            cmake {
+                val key = localProperties.getProperty("CLOUDFLARE_API_KEY") ?: ""
+                // 將 Key 傳入 C++ 編譯參數，並加上引號以確保作為字串常值處理
+                arguments("-DAPI_KEY=\\\"$key\\\"")
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
     }
 
     buildTypes {
