@@ -21,8 +21,8 @@ sealed interface ScanUiState {
     data class Error(val message: String, val title: String = "錯誤") : ScanUiState
 }
 
-class MainViewModel : ViewModel() {
-    private val repository = AntiFraudRepository()
+// 修復：增加建構子參數以符合 Factory 的呼叫
+class MainViewModel(private val repository: AntiFraudRepository) : ViewModel() {
 
     private val _urlState = MutableStateFlow<ScanUiState>(ScanUiState.Idle)
     private val _phoneState = MutableStateFlow<ScanUiState>(ScanUiState.Idle)
@@ -47,6 +47,7 @@ class MainViewModel : ViewModel() {
     fun scan(mode: DetectionMode, input: String) {
         val stateFlow = getMutableState(mode)
         stateFlow.value = ScanUiState.Loading
+        val trimmedInput = input.trim()
         
         viewModelScope.launch {
             val result = repository.scan(mode, trimmedInput)
@@ -113,7 +114,6 @@ class MainViewModel : ViewModel() {
             reasons = reasons
         )
     }
-
 
     companion object {
         val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
