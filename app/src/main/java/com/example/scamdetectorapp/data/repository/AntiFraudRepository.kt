@@ -17,11 +17,12 @@ class AntiFraudRepository {
                     val response = api.getData(phoneNumber = input)
                     if (response.success) {
                         val data = response.data
+                        val riskLevel = data?.riskLevel ?: "NODATA"
                         ScanResult(
-                            riskLevel = data?.riskLevel ?: "UNKNOWN",
+                            riskLevel = riskLevel,
                             description = data?.description
                         )
-                    } else throwApiException(response.version)
+                    } else throwApiException(response.toString())
                 }
                 DetectionMode.URL -> {
                     var urlToCheck = input.trim()
@@ -31,23 +32,25 @@ class AntiFraudRepository {
                     val response = api.getUrlCheck(url = urlToCheck)
                     if (response.success) {
                         val data = response.data
+                        val riskLevel = data?.riskLevel ?: "NODATA"
                         ScanResult(
-                            riskLevel = data?.riskLevel ?: "UNKNOWN",
+                            riskLevel = riskLevel,
                             description = data?.description,
                             threatType = data?.threatType
                         )
-                    } else throwApiException(response.version)
+                    } else throwApiException(response.toString())
                 }
                 DetectionMode.TEXT -> {
                     val response = api.postAiCheck(body = AiCheckRequest(text = input))
                     if (response.success) {
                         val data = response.data
+                        val riskLevel = data?.riskLevel ?: "NODATA"
                         ScanResult(
-                            riskLevel = data?.riskLevel ?: "UNKNOWN",
+                            riskLevel = riskLevel,
                             description = data?.description,
                             suggestion = data?.suggestion
                         )
-                    } else throwApiException(response.version)
+                    } else throwApiException(response.toString())
                 }
             }
             Result.success(result)
@@ -56,7 +59,7 @@ class AntiFraudRepository {
         }
     }
 
-    private fun throwApiException(version: String): Nothing {
-        throw Exception("API 回傳失敗: $version")
+    private fun throwApiException(response: String): Nothing {
+        throw Exception("API 回傳失敗: $response")
     }
 }

@@ -11,16 +11,12 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.ContentPaste
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalFocusManager
@@ -38,7 +34,7 @@ import com.example.scamdetectorapp.presentation.model.ScanUiModel
 import com.example.scamdetectorapp.presentation.viewmodel.MainViewModel
 import com.example.scamdetectorapp.presentation.viewmodel.ScanUiState
 
-enum class ScreenStep { INPUT, SCANNING, RESULT }
+enum class ScreenStep { INPUT, SCANNING, RESULT, ERROR }
 
 @Composable
 fun GenericDetectionFlow(
@@ -55,16 +51,11 @@ fun GenericDetectionFlow(
     val focusManager = LocalFocusManager.current
     val uiState by viewModel.uiState.collectAsState()
 
-    // 監聽 UI State 變化來決定 Step
     LaunchedEffect(uiState) {
         when (uiState) {
             is ScanUiState.Loading -> step = ScreenStep.SCANNING
             is ScanUiState.Success -> step = ScreenStep.RESULT
-            is ScanUiState.Error -> {
-                // 錯誤處理，這裡簡單跳到結果頁顯示錯誤，或者可以彈出 Toast
-                // 為了配合現有 UI，我們將錯誤視為一種結果顯示
-                step = ScreenStep.RESULT
-            }
+            is ScanUiState.Error -> step = ScreenStep.ERROR
             is ScanUiState.Idle -> {
                 if (step != ScreenStep.INPUT) step = ScreenStep.INPUT
             }
@@ -105,29 +96,71 @@ fun GenericDetectionFlow(
         }
 
         AnimatedVisibility(visible = step == ScreenStep.RESULT, enter = fadeIn(), exit = fadeOut()) {
-            when (val state = uiState) {
-                is ScanUiState.Success -> {
-                    ResultScreen(
-                        originalText = inputText,
-                        result = state.result,
-                        onBack = { reset() }
-                    )
-                }
-                is ScanUiState.Error -> {
-                    // 顯示錯誤畫面，這裡復用 ResultScreen 但顯示錯誤資訊
-                    ResultScreen(
-                        originalText = inputText,
-                        result = ScanUiModel(
-                            isSafe = true, // 錯誤時預設顯示安全或中立
-                            score = 0,
-                            title = state.title,
-                            reasons = listOf(state.message)
-                        ),
-                        onBack = { reset() }
-                    )
-                }
-                else -> {}
+            if (uiState is ScanUiState.Success) {
+                FraudResultScreen(
+                    originalText = inputText,
+                    result = (uiState as ScanUiState.Success).result,
+                    onBack = { reset() }
+                )
             }
+        }
+
+        AnimatedVisibility(visible = step == ScreenStep.ERROR, enter = fadeIn(), exit = fadeOut()) {
+            if (uiState is ScanUiState.Error) {
+                ErrorScreen(
+                    title = (uiState as ScanUiState.Error).title,
+                    message = (uiState as ScanUiState.Error).message,
+                    onBack = { reset() }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ErrorScreen(title: String, message: String, onBack: () -> Unit) {
+    val textWhite = MaterialTheme.colorScheme.onBackground
+    val textGrey = colorResource(R.color.scam_text_grey)
+    val surfaceColor = MaterialTheme.colorScheme.surface
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = textWhite)
+            }
+            Spacer(Modifier.width(8.dp))
+            Text("檢測失敗", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = textWhite)
+        }
+        Spacer(Modifier.height(24.dp))
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = surfaceColor),
+            shape = RoundedCornerShape(24.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(32.dp)
+                    .fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(title, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                Spacer(Modifier.height(16.dp))
+                Text(message, color = textGrey, textAlign = TextAlign.Center)
+            }
+        }
+        Spacer(Modifier.weight(1f))
+        Button(
+            onClick = onBack,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = surfaceColor)
+        ) {
+            Text("返回", color = textWhite)
         }
     }
 }
@@ -257,108 +290,3 @@ fun ScanningScreen(onCancel: () -> Unit) {
     }
 }
 
-@Composable
-fun ResultScreen(originalText: String, result: ScanUiModel, onBack: () -> Unit) {
-    val safeColor = colorResource(R.color.scam_safe_green)
-    val riskColor = colorResource(R.color.scam_risk_red)
-    val warningColor = colorResource(R.color.scam_gold_warning)
-    val textWhite = MaterialTheme.colorScheme.onBackground
-    val textGrey = colorResource(R.color.scam_text_grey)
-    val surfaceColor = MaterialTheme.colorScheme.surface
-    val backgroundColor = MaterialTheme.colorScheme.background
-
-    val statusColor = if (result.isSafe) safeColor else riskColor
-    val icon = if (result.isSafe) Icons.Default.CheckCircle else Icons.Default.Warning
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp)
-            .verticalScroll(rememberScrollState())
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = textWhite)
-            }
-            Spacer(Modifier.width(8.dp))
-            Text("檢測結果", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = textWhite)
-        }
-
-        Spacer(Modifier.height(24.dp))
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = surfaceColor),
-            shape = RoundedCornerShape(24.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Icon(icon, contentDescription = null, tint = statusColor, modifier = Modifier.size(64.dp))
-                Spacer(Modifier.height(16.dp))
-                Text(result.title, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = statusColor)
-                Spacer(Modifier.height(8.dp))
-
-                Text(if(result.isSafe) "安全指數" else "風險指數", color = textGrey, fontSize = 12.sp)
-                Spacer(Modifier.height(8.dp))
-                LinearProgressIndicator(
-                    progress = { result.score / 100f },
-                    color = statusColor,
-                    trackColor = backgroundColor,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                )
-                Text("${result.score}%", color = textWhite, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
-            }
-        }
-
-        Spacer(Modifier.height(24.dp))
-
-        Text("分析詳情", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = textWhite)
-        Spacer(Modifier.height(16.dp))
-
-        result.reasons.forEach { reason ->
-            Row(modifier = Modifier.padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Info, contentDescription = null, tint = if(result.isSafe) safeColor else warningColor, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(12.dp))
-                Text(reason, color = textGrey, fontSize = 15.sp)
-            }
-        }
-
-        Spacer(Modifier.height(24.dp))
-
-        Text("原始內容", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = textWhite)
-        Spacer(Modifier.height(8.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(surfaceColor, RoundedCornerShape(12.dp))
-                .padding(16.dp)
-        ) {
-            Text(originalText, color = textGrey, fontSize = 14.sp)
-        }
-
-        Spacer(Modifier.height(32.dp))
-
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Button(
-                onClick = onBack,
-                modifier = Modifier.weight(1f).height(50.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = surfaceColor)
-            ) {
-                Text("再測一次", color = textWhite)
-            }
-
-            Button(
-                onClick = { },
-                modifier = Modifier.weight(1f).height(50.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = if(result.isSafe) safeColor else riskColor)
-            ) {
-                Text(if(result.isSafe) "完成" else "回報詐騙", color = Color.White)
-            }
-        }
-    }
-}

@@ -34,8 +34,9 @@ class MainViewModel(
 
     fun scan(mode: DetectionMode, input: String) {
         _uiState.value = ScanUiState.Loading
+        val trimmedInput = input.trim()
         viewModelScope.launch {
-            val result = repository.scan(mode, input)
+            val result = repository.scan(mode, trimmedInput)
             result.fold(
                 onSuccess = { scanResult ->
                     val uiModel = mapToUiModel(scanResult)
@@ -55,31 +56,51 @@ class MainViewModel(
     }
 
     private fun mapToUiModel(result: ScanResult): ScanUiModel {
-        val reasons = mutableListOf<String>()
         val rLevel = result.riskLevel
-        val isRisk = result.isRisk
 
-        if (isRisk) {
-            reasons.add("風險等級: $rLevel")
-            result.description?.takeIf { it.isNotEmpty() }?.let { reasons.add(it) }
-            result.threatType?.takeIf { it.isNotEmpty() }?.let { reasons.add("威脅類型: $it") }
-            result.suggestion?.takeIf { it.isNotEmpty() }?.let { reasons.add("建議: $it") }
-        } else {
-            reasons.add("無詐騙特徵")
-            reasons.add("正規網域/號碼/內容")
+        val score = when (rLevel?.uppercase()) {
+            "HIGH" -> 85
+            "MEDIUM" -> 60
+            "LOW" -> 20
+            "SAFE" -> 10
+            "NODATA" -> 0
+            else -> 0
         }
 
-        if (reasons.isEmpty()) {
-            reasons.add("無詳細資訊")
+        val reasons = mutableListOf<String>()
+        val title: String
+
+        when (rLevel?.uppercase()) {
+            "HIGH", "MEDIUM", "LOW" -> {
+                title = when (rLevel.uppercase()) {
+                    "HIGH" -> "高風險威脅"
+                    "MEDIUM" -> "中風險威脅"
+                    else -> "低風險威脅"
+                }
+                reasons.add("風險等級: $rLevel")
+                result.description?.takeIf { it.isNotEmpty() }?.let { reasons.add(it) }
+                result.threatType?.takeIf { it.isNotEmpty() }?.let { reasons.add("威脅類型: $it") }
+                result.suggestion?.takeIf { it.isNotEmpty() }?.let { reasons.add("建議: $it") }
+            }
+            "SAFE" -> {
+                title = "安全內容"
+                reasons.add("無詐騙特徵")
+                reasons.add("正規網域/號碼/內容")
+            }
+            else -> { // Catches NODATA and any other case
+                title = "查無資料"
+                reasons.add("資料庫暫無此紀錄")
+            }
         }
 
         return ScanUiModel(
-            isSafe = !isRisk,
-            score = if (isRisk) 30 else 95,
-            title = if (isRisk) "高風險威脅" else "安全內容",
+            isSafe = rLevel == "SAFE" || rLevel == "NODATA",
+            score = score,
+            title = title,
             reasons = reasons
         )
     }
+
 
     companion object {
         val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
