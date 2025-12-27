@@ -49,7 +49,7 @@ class MainViewModel : ViewModel() {
         stateFlow.value = ScanUiState.Loading
         
         viewModelScope.launch {
-            val result = repository.scan(mode, trimmedInput)
+            val result = repository.scan(mode, input.trim())
             result.fold(
                 onSuccess = { scanResult ->
                     val uiModel = mapToUiModel(scanResult)
