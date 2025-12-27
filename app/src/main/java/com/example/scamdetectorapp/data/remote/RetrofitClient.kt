@@ -1,6 +1,5 @@
 package com.example.scamdetectorapp.data.remote
 
-import com.example.scamdetectorapp.BuildConfig
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -9,11 +8,17 @@ import java.util.concurrent.TimeUnit
 object RetrofitClient {
     private const val BASE_URL = "https://antifraud-gateway.lyc-dev.workers.dev/"
 
+    init {
+        System.loadLibrary("scamdetectorapp")
+    }
+
+    private external fun getApiKey(): String
+
     private val okHttpClient = OkHttpClient.Builder()
         .addInterceptor { chain ->
             val original = chain.request()
             val request = original.newBuilder()
-                .header("x-api-key", BuildConfig.CLOUDFLARE_API_KEY)
+                .header("x-api-key", getApiKey())
                 .method(original.method, original.body)
                 .build()
             chain.proceed(request)

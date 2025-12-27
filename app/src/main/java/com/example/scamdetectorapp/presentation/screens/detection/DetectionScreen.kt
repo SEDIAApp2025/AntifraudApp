@@ -48,7 +48,7 @@ fun GenericDetectionFlow(
     desc: String,
     keyboardType: KeyboardType,
     isMultiLine: Boolean = false,
-    viewModel: MainViewModel = viewModel()
+    viewModel: MainViewModel = viewModel(factory = MainViewModel.Factory)
 ) {
     var step by remember { mutableStateOf(ScreenStep.INPUT) }
     var inputText by remember { mutableStateOf("") }

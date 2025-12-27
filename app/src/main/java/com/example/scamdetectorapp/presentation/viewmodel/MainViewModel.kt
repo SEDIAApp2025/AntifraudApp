@@ -1,6 +1,7 @@
 package com.example.scamdetectorapp.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.scamdetectorapp.data.repository.AntiFraudRepository
 import com.example.scamdetectorapp.domain.model.DetectionMode
@@ -20,8 +21,9 @@ sealed interface ScanUiState {
     data class Error(val message: String, val title: String = "錯誤") : ScanUiState
 }
 
-class MainViewModel : ViewModel() {
-    private val repository = AntiFraudRepository() // In a real app, use DI (Hilt/Koin)
+class MainViewModel(
+    private val repository: AntiFraudRepository
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow<ScanUiState>(ScanUiState.Idle)
     val uiState: StateFlow<ScanUiState> = _uiState.asStateFlow()
@@ -55,7 +57,7 @@ class MainViewModel : ViewModel() {
     private fun mapToUiModel(result: ScanResult): ScanUiModel {
         val reasons = mutableListOf<String>()
         val rLevel = result.riskLevel
-        val isRisk = !rLevel.equals("UNKNOWN", ignoreCase = true) && !rLevel.equals("LOW", ignoreCase = true)
+        val isRisk = result.isRisk
 
         if (isRisk) {
             reasons.add("風險等級: $rLevel")
@@ -77,5 +79,14 @@ class MainViewModel : ViewModel() {
             title = if (isRisk) "高風險威脅" else "安全內容",
             reasons = reasons
         )
+    }
+
+    companion object {
+        val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                return MainViewModel(AntiFraudRepository()) as T
+            }
+        }
     }
 }
