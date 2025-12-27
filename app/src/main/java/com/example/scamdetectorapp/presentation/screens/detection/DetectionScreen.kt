@@ -36,10 +36,11 @@ import com.example.scamdetectorapp.presentation.viewmodel.MainViewModel
 import com.example.scamdetectorapp.presentation.viewmodel.ScanUiState
 
 /**
- * 定義畫面顯示的三個階段
+ * 定義畫面顯示的四個階段
  * INPUT: 輸入內容階段
  * SCANNING: 正在連網檢測階段
  * RESULT: 顯示檢測報告階段
+ * ERROR: 檢測過程中發生錯誤或失敗時的階段
  */
 enum class ScreenStep { INPUT, SCANNING, RESULT, ERROR }
 
