@@ -7,28 +7,24 @@ import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.Query
 
-/**
- * 每一筆詐騙資料的內容
- */
+// 1. 定義後端回傳的基本結構
+//使用 JsonElement 讓 data 欄位可以接收 [] (陣列) 或 {} (物件)
+data class AntiFraudResponse(
+    val success: Boolean,
+    val version: String,
+    val data: JsonElement?  // 使用 JsonElement 來處理不固定的格式
+)
+// 2. 定義詐騙報告的詳細內容
 data class FraudReport(
     val id: String? = null,
     val phoneNumber: String? = null,
     val riskLevel: String? = null,
-    val description: String? = null
+    val description: String? = null,
+    val source: String?
 )
 
 data class AiCheckRequest(
     val text: String
-)
-
-/**
- * 統一的 Response 包裝
- * 使用 JsonElement 讓 data 欄位可以接收 [] (陣列) 或 {} (物件)
- */
-data class AntiFraudResponse(
-    val success: Boolean,
-    val version: String,
-    val data: JsonElement?
 )
 
 interface AntiFraudApi {

@@ -10,10 +10,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.border
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,12 +37,23 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.automirrored.outlined.Message
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.HttpException
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import android.util.Log
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.outlined.Home
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import com.google.gson.JsonElement
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+import retrofit2.http.GET
+import retrofit2.http.Header
+import retrofit2.http.Query
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -131,34 +145,74 @@ fun SplashScreen(onFinished: () -> Unit) {
 // ==================== 3. 主程式 (含底部導覽) ====================
 @Composable
 fun MainAppScreen() {
-    var currentTab by remember { mutableStateOf("簡訊") }
-    // 直接使用 Theme 裡的背景色
-    val backgroundColor = MaterialTheme.colorScheme.background
+    val navController = rememberNavController()
+    // 1. 定義 Tabs，加入「首頁」
+    val tabs = listOf("首頁", "網址", "電話", "簡訊")
+
+    // 取得目前的路由，用來控制底部導覽列的變色
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentDestination = navBackStackEntry?.destination
 
     Scaffold(
-        containerColor = backgroundColor,
+        containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
-            CustomBottomBar(currentTab) { selected -> currentTab = selected }
+            // 傳入目前的路由給 BottomBar
+            CustomBottomBar(
+                currentTab = currentDestination?.route ?: "首頁",
+                onTabSelected = { newTab ->
+                    navController.navigate(newTab) {
+                        popUpTo(navController.graph.findStartDestination().id) {
+                            saveState = true
+                        }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                }
+            )
         }
     ) { innerPadding ->
-        Box(modifier = Modifier.padding(innerPadding)) {
-            when (currentTab) {
-                "網址" -> GenericDetectionFlow(
-                    mode = DetectionMode.URL,
+        NavHost(
+            navController = navController,
+            startDestination = "首頁", // 2. 預設顯示首頁
+            modifier = Modifier.padding(innerPadding)
+        ) {
+            // 3. 首頁路由：傳入 lambda 讓首頁按鈕可以控制跳轉
+            composable("首頁") {
+                HomeScreen(
+                    onNavigateTo = { targetTab ->
+                        navController.navigate(targetTab) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                )
+            }
+
+            // 其他功能頁面
+            composable("網址") {
+                GenericDetectionFlow(
+                    type = DetectionType.URL, // 傳入 URL 類型
                     title = "檢測詐騙網址",
                     placeholder = "貼上網址，例如 https://...",
                     desc = "支援檢查釣魚網站、假冒連結",
                     keyboardType = KeyboardType.Uri
                 )
-                "電話" -> GenericDetectionFlow(
-                    mode = DetectionMode.PHONE,
+            }
+            composable("電話") {
+                GenericDetectionFlow(
+                    type = DetectionType.PHONE, // 傳入 PHONE 類型
                     title = "檢測詐騙電話",
                     placeholder = "輸入電話號碼 (如 0912...)",
                     desc = "檢查常見詐騙客服、假警方電話",
                     keyboardType = KeyboardType.Phone
                 )
-                "簡訊" -> GenericDetectionFlow(
-                    mode = DetectionMode.TEXT,
+            }
+            composable("簡訊") {
+                GenericDetectionFlow(
+                    type = DetectionType.SMS, // 傳入 SMS 類型
                     title = "檢測詐騙簡訊",
                     placeholder = "貼上簡訊內容...",
                     desc = "分析關鍵字、假連結、催款語法",
@@ -180,7 +234,9 @@ fun CustomBottomBar(currentTab: String, onTabSelected: (String) -> Unit) {
         containerColor = surfaceColor,
         tonalElevation = 8.dp
     ) {
+        // 更新列表：加入首頁
         val items = listOf(
+            Triple("首頁", Icons.Filled.Home, Icons.Outlined.Home),
             Triple("網址", Icons.Filled.Public, Icons.Outlined.Public),
             Triple("電話", Icons.Filled.Phone, Icons.Outlined.Phone),
             Triple("簡訊", Icons.AutoMirrored.Filled.Message, Icons.AutoMirrored.Outlined.Message)
@@ -221,9 +277,12 @@ data class ScanResult(
     val reasons: List<String>
 )
 
+// 定義檢測類型，方便管理
+enum class DetectionType { PHONE, URL, SMS }
+
 @Composable
 fun GenericDetectionFlow(
-    mode: DetectionMode,
+    type: DetectionType, // 新增：傳入檢測類型
     title: String,
     placeholder: String,
     desc: String,
@@ -234,8 +293,8 @@ fun GenericDetectionFlow(
     var inputText by remember { mutableStateOf("") }
     var resultData by remember { mutableStateOf<ScanResult?>(null) }
     val focusManager = LocalFocusManager.current
+    val gson = remember { com.google.gson.Gson() }
 
-    // 模擬檢測邏輯
     fun startScan() {
         focusManager.clearFocus()
         step = ScreenStep.SCANNING
@@ -244,152 +303,84 @@ fun GenericDetectionFlow(
     LaunchedEffect(step) {
         if (step == ScreenStep.SCANNING) {
             try {
-                val retrofit = Retrofit.Builder()
-                    .baseUrl("https://antifraud-gateway.lyc-dev.workers.dev/")
-                    .addConverterFactory(GsonConverterFactory.create())
-                    .build()
+                // 從 BuildConfig 讀取 API Key
+                val apiKey = BuildConfig.CLOUDFLARE_API_KEY
 
-                val antiFraudApi = retrofit.create(AntiFraudApi::class.java)
-                val gson = Gson()
-                var isRisk = false
-                val reasons = mutableListOf<String>()
-
-                val response = when (mode) {
-                    DetectionMode.PHONE -> antiFraudApi.getData(
-                        apiKey = BuildConfig.CLOUDFLARE_API_KEY,
+                // ========== 1. 根據類型呼叫對應的 API ==========
+                val response = when (type) {
+                    DetectionType.PHONE -> RetrofitClient.api.getData(
+                        apiKey = apiKey,
                         phoneNumber = inputText
                     )
-                    DetectionMode.URL -> {
-                        var urlToCheck = inputText.trim()
-                        if (!urlToCheck.startsWith("http://") && !urlToCheck.startsWith("https://")) {
-                            urlToCheck = "https://$urlToCheck"
-                        }
-                        antiFraudApi.getUrlCheck(
-                            apiKey = BuildConfig.CLOUDFLARE_API_KEY,
-                            url = urlToCheck
-                        )
-                    }
-                    DetectionMode.TEXT -> antiFraudApi.postAiCheck(
-                        apiKey = BuildConfig.CLOUDFLARE_API_KEY,
+                    DetectionType.URL -> RetrofitClient.api.getUrlCheck(
+                        apiKey = apiKey,
+                        url = inputText
+                    )
+                    DetectionType.SMS -> RetrofitClient.api.postAiCheck(
+                        apiKey = apiKey,
                         body = AiCheckRequest(text = inputText)
                     )
                 }
 
-                if (response.success) {
-                    val jsonElement = response.data
+                // ========== 2. 解析資料 (通用邏輯) ==========
+                val reports = mutableListOf<FraudReport>()
+                val jsonData = response.data // 使用你定義的 JsonElement?
 
-                    if (jsonElement != null) {
-                        when (mode) {
-                            DetectionMode.PHONE -> {
-                                // 單筆查詢回傳 Object
-                                if (jsonElement.isJsonObject) {
-                                    val report: FraudReport = gson.fromJson(jsonElement, FraudReport::class.java)
-                                    val rLevel = report.riskLevel ?: "UNKNOWN"
-
-                                    // 只有當 riskLevel 不是 UNKNOWN 且不是 LOW 時才視為風險
-                                    if (!rLevel.equals("UNKNOWN", ignoreCase = true) && !rLevel.equals("LOW", ignoreCase = true)) {
-                                        isRisk = true
-                                        reasons.add("風險等級: $rLevel")
-                                        report.description?.let { reasons.add(it) }
-                                    }
-                                }
-                            }
-                            DetectionMode.URL -> {
-                                if (jsonElement.isJsonObject) {
-                                    val jsonObj = jsonElement.asJsonObject
-                                    val riskLevel = if (jsonObj.has("riskLevel") && !jsonObj.get("riskLevel").isJsonNull) jsonObj.get("riskLevel").asString else "UNKNOWN"
-                                    val description = if (jsonObj.has("description") && !jsonObj.get("description").isJsonNull) jsonObj.get("description").asString else ""
-                                    val threatType = if (jsonObj.has("threatType") && !jsonObj.get("threatType").isJsonNull) jsonObj.get("threatType").asString else ""
-
-                                    // 只要不是 UNKNOWN 且不是 LOW，都視為風險 (HIGH, MEDIUM)
-                                    if (!riskLevel.equals("UNKNOWN", ignoreCase = true) && !riskLevel.equals("LOW", ignoreCase = true)) {
-                                        isRisk = true
-                                        reasons.add("風險等級: $riskLevel")
-                                        if (threatType.isNotEmpty()) reasons.add("威脅類型: $threatType")
-                                        if (description.isNotEmpty()) reasons.add(description)
-                                    }
-                                }
-                            }
-                            DetectionMode.TEXT -> {
-                                if (jsonElement.isJsonObject) {
-                                    val jsonObj = jsonElement.asJsonObject
-                                    val riskLevel = if (jsonObj.has("riskLevel") && !jsonObj.get("riskLevel").isJsonNull) jsonObj.get("riskLevel").asString else "UNKNOWN"
-                                    val description = if (jsonObj.has("description") && !jsonObj.get("description").isJsonNull) jsonObj.get("description").asString else ""
-                                    val suggestion = if (jsonObj.has("suggestion") && !jsonObj.get("suggestion").isJsonNull) jsonObj.get("suggestion").asString else ""
-
-                                    // 只要不是 UNKNOWN 且不是 LOW，都視為風險 (HIGH, MEDIUM)
-                                    if (!riskLevel.equals("UNKNOWN", ignoreCase = true) && !riskLevel.equals("LOW", ignoreCase = true)) {
-                                        isRisk = true
-                                        reasons.add("風險等級: $riskLevel")
-                                        if (description.isNotEmpty()) reasons.add(description)
-                                        if (suggestion.isNotEmpty()) reasons.add("建議: $suggestion")
-                                    }
-                                }
-                            }
+                if (response.success && jsonData != null) {
+                    when {
+                        jsonData.isJsonArray -> {
+                            val listType = object : com.google.gson.reflect.TypeToken<List<FraudReport>>() {}.type
+                            val list: List<FraudReport> = gson.fromJson(jsonData, listType)
+                            reports.addAll(list)
+                        }
+                        jsonData.isJsonObject -> {
+                            val report: FraudReport = gson.fromJson(jsonData, FraudReport::class.java)
+                            reports.add(report)
                         }
                     }
-
-                    if (!isRisk) {
-                        reasons.add("無詐騙特徵")
-                        reasons.add("正規網域/號碼/內容")
-                    }
-                    
-                    if (reasons.isEmpty()) {
-                         reasons.add("無詳細資訊")
-                    }
-
-                    resultData = ScanResult(
-                        isSafe = !isRisk,
-                        score = if (isRisk) 30 else 95,
-                        title = if (isRisk) "高風險威脅" else "安全內容",
-                        reasons = reasons
-                    )
-                } else {
-                    resultData = ScanResult(
-                        isSafe = true,
-                        score = 0,
-                        title = "查詢失敗",
-                        reasons = listOf("API 回傳失敗: ${response.version}")
-                    )
                 }
-            } catch (e: HttpException) {
-                val errorBody = e.response()?.errorBody()?.string()
-                Log.e("API_ERROR", "HttpException: ${e.code()} $errorBody")
+
+                // ========== 3. 轉換為 UI 顯示 ==========
+                // 注意：這裡配合你的 FraudReport 欄位名稱 (riskLevel)
+                val isSafe = reports.isEmpty() || reports.all {
+                    val level = it.riskLevel?.lowercase()
+                    level == "low" || level == "safe" || level == null
+                }
+                val riskCount = reports.size
+
+                val displayReasons = if (reports.isNotEmpty()) {
+                    reports.map {
+                        // 組合顯示：來源 - 描述
+                        "${it.source ?: "未知來源"}: ${it.description ?: "可疑活動"}"
+                    }
+                } else if (response.success) {
+                    listOf("資料庫中無此記錄", "未發現異常")
+                } else {
+                    listOf("查詢無結果")
+                }
+
                 resultData = ScanResult(
-                    isSafe = true,
-                    score = 0,
-                    title = "伺服器錯誤 (${e.code()})",
-                    reasons = listOf("伺服器發生問題", errorBody ?: "無詳細錯誤訊息")
+                    isSafe = isSafe,
+                    score = if (isSafe) 10 else 85 + (riskCount * 2),
+                    title = if (isSafe) "未發現威脅" else "發現潛在風險",
+                    reasons = displayReasons
                 )
-            } catch (e: com.google.gson.JsonSyntaxException) {
-                Log.e("API_ERROR", "JsonSyntaxException: ${e.message}")
-                resultData = ScanResult(
-                    isSafe = true,
-                    score = 0,
-                    title = "資料格式錯誤",
-                    reasons = listOf("API 回傳了非 JSON 格式的資料", e.message ?: "解析失敗")
-                )
-            } catch (e: java.net.SocketTimeoutException) {
-                Log.e("API_ERROR", "SocketTimeoutException: ${e.message}")
-                resultData = ScanResult(
-                    isSafe = true,
-                    score = 0,
-                    title = "連線逾時",
-                    reasons = listOf("伺服器回應太慢", "請稍後再試")
-                )
+
             } catch (e: Exception) {
-                Log.e("API_ERROR", "Error: ${e.message}")
+                e.printStackTrace()
                 resultData = ScanResult(
                     isSafe = true,
                     score = 0,
-                    title = "連線錯誤",
-                    reasons = listOf("無法連線至伺服器", "${e.javaClass.simpleName}: ${e.message}")
+                    title = "檢測無法完成",
+                    reasons = listOf("網路連線錯誤", e.message ?: "未知錯誤")
                 )
+            } finally {
+                step = ScreenStep.RESULT
             }
-            step = ScreenStep.RESULT
         }
     }
 
+    // ... (UI 佈局 Box/AnimatedVisibility 保持不變，直接複製原本的即可) ...
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -662,3 +653,154 @@ fun ResultScreen(originalText: String, result: ScanResult, onBack: () -> Unit) {
         }
     }
 }
+// ==================== 6. 首頁實作 ====================
+@Composable
+fun HomeScreen(onNavigateTo: (String) -> Unit) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // ========== 1. 頂部 Logo 區域 ==========
+        Spacer(modifier = Modifier.height(48.dp))
+        Box(
+            modifier = Modifier
+                .size(100.dp)
+                .background(surfaceColor, androidx.compose.foundation.shape.CircleShape)
+                .border(2.dp, primaryColor.copy(alpha = 0.5f), androidx.compose.foundation.shape.CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Shield,
+                contentDescription = "Logo",
+                tint = primaryColor,
+                modifier = Modifier.size(60.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = "SCAM GUARD",
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 2.sp,
+            color = onSurfaceColor
+        )
+        Text(
+            text = "您的全方位防詐護盾",
+            fontSize = 14.sp,
+            color = androidx.compose.ui.res.colorResource(R.color.scam_text_grey)
+        )
+
+        Spacer(modifier = Modifier.height(48.dp))
+
+        // ========== 2. 三大功能卡片 ==========
+        Text(
+            text = "選擇檢測項目",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            color = onSurfaceColor,
+            modifier = Modifier.align(Alignment.Start)
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // 網址卡片
+        FeatureCard(
+            title = "網址檢測",
+            desc = "檢查釣魚網站與惡意連結",
+            icon = Icons.Outlined.Public,
+            onClick = { onNavigateTo("網址") }
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // 電話卡片
+        FeatureCard(
+            title = "電話檢測",
+            desc = "辨識騷擾與詐騙來電",
+            icon = Icons.Outlined.Phone,
+            onClick = { onNavigateTo("電話") }
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // 簡訊卡片
+        FeatureCard(
+            title = "簡訊檢測",
+            desc = "分析可疑簡訊內容",
+            icon = Icons.AutoMirrored.Outlined.Message,
+            onClick = { onNavigateTo("簡訊") }
+        )
+    }
+}
+
+// 抽取出來的卡片元件，讓程式碼更乾淨
+@Composable
+fun FeatureCard(
+    title: String,
+    desc: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(20.dp)
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // 圖示背景
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), androidx.compose.foundation.shape.CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            // 文字內容
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                Text(text = desc, fontSize = 12.sp, color = androidx.compose.ui.res.colorResource(R.color.scam_text_grey))
+            }
+
+            // 箭頭
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = null,
+                tint = androidx.compose.ui.res.colorResource(R.color.scam_text_grey)
+            )
+        }
+    }
+}
+// ==================== 7. API 與資料結構定義 (補在檔案最下方) ====================
+object RetrofitClient {
+    // 請確認這是你的 Cloudflare Worker 或後端網址
+    private const val BASE_URL = "https://antifraud-gateway.lyc-dev.workers.dev/"
+
+    val api: AntiFraudApi by lazy {
+        retrofit2.Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .addConverterFactory(retrofit2.converter.gson.GsonConverterFactory.create())
+            .build()
+            .create(AntiFraudApi::class.java)
+    }
+}
+
+
