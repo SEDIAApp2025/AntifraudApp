@@ -8,9 +8,14 @@
       <color name="black">#FF000000</color>
       <color name="white">#FFFFFFFF</color>
 
-      <color name="scam_background">#0B1221</color> <color name="scam_surface">#1C2436</color>    <color name="scam_primary">#2979FF</color>    <color name="scam_text_white">#FFFFFF</color>
+      <color name="scam_background">#0B1221</color>
+      <color name="scam_surface">#1C2436</color>
+      <color name="scam_primary">#2979FF</color>
+      <color name="scam_text_white">#FFFFFF</color>
       <color name="scam_text_grey">#8F9BB3</color>
-      <color name="scam_safe_green">#00C853</color>
+      <color name="scam_safe_green">#4CAF50</color>
       <color name="scam_risk_red">#D32F2F</color>
       <color name="scam_gold_warning">#FFD700</color>
+      <color name="scam_orange">#FFA500</color>
+      <color name="scam_neutral_gray">#808080</color>
 </resources>
