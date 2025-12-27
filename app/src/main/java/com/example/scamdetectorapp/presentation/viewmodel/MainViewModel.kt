@@ -94,7 +94,7 @@ class MainViewModel(
         }
 
         return ScanUiModel(
-            isSafe = !result.isRisk,
+            isSafe = rLevel == "SAFE" || rLevel == "NODATA",
             score = score,
             title = title,
             reasons = reasons

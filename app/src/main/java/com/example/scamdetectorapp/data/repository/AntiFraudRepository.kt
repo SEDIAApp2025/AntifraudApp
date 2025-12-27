@@ -19,7 +19,6 @@ class AntiFraudRepository {
                         val data = response.data
                         val riskLevel = data?.riskLevel ?: "NODATA"
                         ScanResult(
-                            isRisk = riskLevel != "NODATA" && riskLevel != "SAFE",
                             riskLevel = riskLevel,
                             description = data?.description
                         )
@@ -35,7 +34,6 @@ class AntiFraudRepository {
                         val data = response.data
                         val riskLevel = data?.riskLevel ?: "NODATA"
                         ScanResult(
-                            isRisk = riskLevel != "NODATA" && riskLevel != "SAFE",
                             riskLevel = riskLevel,
                             description = data?.description,
                             threatType = data?.threatType
@@ -48,7 +46,6 @@ class AntiFraudRepository {
                         val data = response.data
                         val riskLevel = data?.riskLevel ?: "NODATA"
                         ScanResult(
-                            isRisk = riskLevel != "NODATA" && riskLevel != "SAFE",
                             riskLevel = riskLevel,
                             description = data?.description,
                             suggestion = data?.suggestion
