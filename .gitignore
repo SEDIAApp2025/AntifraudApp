@@ -1,5 +1,12 @@
 *.log
 
+# Gradle files
+.gradle/
+build/
+
+# Local configuration file (sdk.dir, etc)
+local.properties
+
 # Android Studio generated files and folders
 captures/
 .externalNativeBuild/
@@ -24,3 +31,6 @@ google-services.json
 
 # Android Profiling
 *.hprof
+
+# Mac
+.DS_Store

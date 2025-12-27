@@ -1,8 +1,10 @@
-package com.example.myapplication
+package com.example.scamdetectorapp
 
 import com.google.gson.JsonElement
+import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Header
+import retrofit2.http.POST
 import retrofit2.http.Query
 
 /**
@@ -15,6 +17,10 @@ data class FraudReport(
     val description: String? = null
 )
 
+data class AiCheckRequest(
+    val text: String
+)
+
 /**
  * 統一的 Response 包裝
  * 使用 JsonElement 讓 data 欄位可以接收 [] (陣列) 或 {} (物件)
@@ -22,7 +28,7 @@ data class FraudReport(
 data class AntiFraudResponse(
     val success: Boolean,
     val version: String,
-    val data: JsonElement
+    val data: JsonElement?
 )
 
 interface AntiFraudApi {
@@ -35,5 +41,17 @@ interface AntiFraudApi {
         @Header("x-api-key") apiKey: String,
         @Query("phoneNumber") phoneNumber: String? = null,
         @Query("riskLevel") riskLevel: String? = null
+    ): AntiFraudResponse
+
+    @GET("api/url-check")
+    suspend fun getUrlCheck(
+        @Header("x-api-key") apiKey: String,
+        @Query("url") url: String
+    ): AntiFraudResponse
+
+    @POST("api/ai-check")
+    suspend fun postAiCheck(
+        @Header("x-api-key") apiKey: String,
+        @Body body: AiCheckRequest
     ): AntiFraudResponse
 }
