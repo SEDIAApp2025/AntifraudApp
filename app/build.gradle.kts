@@ -29,11 +29,26 @@ android {
 
         externalNativeBuild {
             cmake {
-                val key = localProperties.getProperty("CLOUDFLARE_API_KEY") ?: ""
-                // 將 Key 傳入 C++ 編譯參數，並加上引號以確保作為字串常值處理
-                arguments("-DAPI_KEY=\\\"$key\\\"")
+                val rawKey = localProperties.getProperty("CLOUDFLARE_API_KEY") ?: ""
+                // 去除可能存在的引號
+                val key = rawKey.replace("\"", "").trim()
+                // 將 Key 傳入 C++ 編譯參數
+                arguments("-DAPI_KEY=$key")
             }
         }
+
+        // 讀取 gradle.properties 中的 BASE_URL
+        val propertyUrl = project.findProperty("BASE_URL") as? String
+        // 確保去除空白和可能誤加的引號
+        val baseUrl = propertyUrl?.replace("\"", "")?.trim() ?: ""
+        
+        if (baseUrl.isEmpty()) {
+            println("WARNING: BASE_URL not found in gradle.properties or is empty.")
+        } else {
+            println("INFO: BASE_URL loaded: [$baseUrl]")
+        }
+        
+        buildConfigField("String", "BASE_URL", "\"$baseUrl\"")
     }
 
     externalNativeBuild {
