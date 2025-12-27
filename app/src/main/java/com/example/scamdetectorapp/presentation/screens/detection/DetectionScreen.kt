@@ -54,9 +54,6 @@ fun GenericDetectionFlow(
     isMultiLine: Boolean = false,
     viewModel: MainViewModel = viewModel(factory = MainViewModel.Factory)
 ) {
-    // 獲取 ViewModel 實例
-    val viewModel: MainViewModel = viewModel()
-    
     // UI 內部導航步驟狀態
     var step by remember { mutableStateOf(ScreenStep.INPUT) }
     var inputText by remember { mutableStateOf("") }
