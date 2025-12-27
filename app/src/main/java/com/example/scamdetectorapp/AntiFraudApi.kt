@@ -28,7 +28,7 @@ data class AiCheckRequest(
 data class AntiFraudResponse(
     val success: Boolean,
     val version: String,
-    val data: JsonElement
+    val data: JsonElement?
 )
 
 interface AntiFraudApi {

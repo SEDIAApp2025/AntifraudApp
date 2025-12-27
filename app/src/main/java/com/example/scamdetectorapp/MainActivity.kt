@@ -36,6 +36,7 @@ import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.automirrored.outlined.Message
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import retrofit2.HttpException
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import android.util.Log
@@ -258,10 +259,16 @@ fun GenericDetectionFlow(
                         apiKey = BuildConfig.CLOUDFLARE_API_KEY,
                         phoneNumber = inputText
                     )
-                    DetectionMode.URL -> antiFraudApi.getUrlCheck(
-                        apiKey = BuildConfig.CLOUDFLARE_API_KEY,
-                        url = inputText
-                    )
+                    DetectionMode.URL -> {
+                        var urlToCheck = inputText.trim()
+                        if (!urlToCheck.startsWith("http://") && !urlToCheck.startsWith("https://")) {
+                            urlToCheck = "https://$urlToCheck"
+                        }
+                        antiFraudApi.getUrlCheck(
+                            apiKey = BuildConfig.CLOUDFLARE_API_KEY,
+                            url = urlToCheck
+                        )
+                    }
                     DetectionMode.TEXT -> antiFraudApi.postAiCheck(
                         apiKey = BuildConfig.CLOUDFLARE_API_KEY,
                         body = AiCheckRequest(text = inputText)
@@ -271,58 +278,52 @@ fun GenericDetectionFlow(
                 if (response.success) {
                     val jsonElement = response.data
 
-                    when (mode) {
-                        DetectionMode.PHONE -> {
-                            if (jsonElement.isJsonArray) {
-                                val listType = object : TypeToken<List<FraudReport>>() {}.type
-                                val reports: List<FraudReport> = gson.fromJson(jsonElement, listType)
-                                if (reports.isNotEmpty()) {
-                                    isRisk = true
-                                    reasons.add("資料庫中有紀錄")
-                                    reports.forEach { report ->
-                                        report.description?.let { reasons.add(it) }
-                                    }
-                                }
-                            } else if (jsonElement.isJsonObject) {
-                                val jsonObj = jsonElement.asJsonObject
-                                val message = if (jsonObj.has("message")) jsonObj.get("message").asString else ""
-                                if (!message.contains("no record", ignoreCase = true)) {
+                    if (jsonElement != null) {
+                        when (mode) {
+                            DetectionMode.PHONE -> {
+                                // 單筆查詢回傳 Object
+                                if (jsonElement.isJsonObject) {
                                     val report: FraudReport = gson.fromJson(jsonElement, FraudReport::class.java)
-                                    if (!report.id.isNullOrEmpty() || !report.riskLevel.isNullOrEmpty()) {
+                                    val rLevel = report.riskLevel ?: "UNKNOWN"
+
+                                    // 只有當 riskLevel 不是 UNKNOWN 且不是 LOW 時才視為風險
+                                    if (!rLevel.equals("UNKNOWN", ignoreCase = true) && !rLevel.equals("LOW", ignoreCase = true)) {
                                         isRisk = true
-                                        reasons.add("資料庫中有紀錄")
+                                        reasons.add("風險等級: $rLevel")
                                         report.description?.let { reasons.add(it) }
                                     }
                                 }
                             }
-                        }
-                        DetectionMode.URL -> {
-                            if (jsonElement.isJsonObject) {
-                                val jsonObj = jsonElement.asJsonObject
-                                val riskLevel = if (jsonObj.has("riskLevel")) jsonObj.get("riskLevel").asString else ""
-                                val description = if (jsonObj.has("description")) jsonObj.get("description").asString else ""
-                                val threatType = if (jsonObj.has("threatType")) jsonObj.get("threatType").asString else ""
+                            DetectionMode.URL -> {
+                                if (jsonElement.isJsonObject) {
+                                    val jsonObj = jsonElement.asJsonObject
+                                    val riskLevel = if (jsonObj.has("riskLevel") && !jsonObj.get("riskLevel").isJsonNull) jsonObj.get("riskLevel").asString else "UNKNOWN"
+                                    val description = if (jsonObj.has("description") && !jsonObj.get("description").isJsonNull) jsonObj.get("description").asString else ""
+                                    val threatType = if (jsonObj.has("threatType") && !jsonObj.get("threatType").isJsonNull) jsonObj.get("threatType").asString else ""
 
-                                if (riskLevel.equals("high", ignoreCase = true) || riskLevel.equals("medium", ignoreCase = true)) {
-                                    isRisk = true
-                                    reasons.add("風險等級: $riskLevel")
-                                    if (threatType.isNotEmpty()) reasons.add("威脅類型: $threatType")
-                                    if (description.isNotEmpty()) reasons.add(description)
+                                    // 只要不是 UNKNOWN 且不是 LOW，都視為風險 (HIGH, MEDIUM)
+                                    if (!riskLevel.equals("UNKNOWN", ignoreCase = true) && !riskLevel.equals("LOW", ignoreCase = true)) {
+                                        isRisk = true
+                                        reasons.add("風險等級: $riskLevel")
+                                        if (threatType.isNotEmpty()) reasons.add("威脅類型: $threatType")
+                                        if (description.isNotEmpty()) reasons.add(description)
+                                    }
                                 }
                             }
-                        }
-                        DetectionMode.TEXT -> {
-                            if (jsonElement.isJsonObject) {
-                                val jsonObj = jsonElement.asJsonObject
-                                val riskLevel = if (jsonObj.has("riskLevel")) jsonObj.get("riskLevel").asString else ""
-                                val description = if (jsonObj.has("description")) jsonObj.get("description").asString else ""
-                                val suggestion = if (jsonObj.has("suggestion")) jsonObj.get("suggestion").asString else ""
+                            DetectionMode.TEXT -> {
+                                if (jsonElement.isJsonObject) {
+                                    val jsonObj = jsonElement.asJsonObject
+                                    val riskLevel = if (jsonObj.has("riskLevel") && !jsonObj.get("riskLevel").isJsonNull) jsonObj.get("riskLevel").asString else "UNKNOWN"
+                                    val description = if (jsonObj.has("description") && !jsonObj.get("description").isJsonNull) jsonObj.get("description").asString else ""
+                                    val suggestion = if (jsonObj.has("suggestion") && !jsonObj.get("suggestion").isJsonNull) jsonObj.get("suggestion").asString else ""
 
-                                if (riskLevel.equals("high", ignoreCase = true) || riskLevel.equals("medium", ignoreCase = true)) {
-                                    isRisk = true
-                                    reasons.add("風險等級: $riskLevel")
-                                    if (description.isNotEmpty()) reasons.add(description)
-                                    if (suggestion.isNotEmpty()) reasons.add("建議: $suggestion")
+                                    // 只要不是 UNKNOWN 且不是 LOW，都視為風險 (HIGH, MEDIUM)
+                                    if (!riskLevel.equals("UNKNOWN", ignoreCase = true) && !riskLevel.equals("LOW", ignoreCase = true)) {
+                                        isRisk = true
+                                        reasons.add("風險等級: $riskLevel")
+                                        if (description.isNotEmpty()) reasons.add(description)
+                                        if (suggestion.isNotEmpty()) reasons.add("建議: $suggestion")
+                                    }
                                 }
                             }
                         }
@@ -351,13 +352,38 @@ fun GenericDetectionFlow(
                         reasons = listOf("API 回傳失敗: ${response.version}")
                     )
                 }
+            } catch (e: HttpException) {
+                val errorBody = e.response()?.errorBody()?.string()
+                Log.e("API_ERROR", "HttpException: ${e.code()} $errorBody")
+                resultData = ScanResult(
+                    isSafe = true,
+                    score = 0,
+                    title = "伺服器錯誤 (${e.code()})",
+                    reasons = listOf("伺服器發生問題", errorBody ?: "無詳細錯誤訊息")
+                )
+            } catch (e: com.google.gson.JsonSyntaxException) {
+                Log.e("API_ERROR", "JsonSyntaxException: ${e.message}")
+                resultData = ScanResult(
+                    isSafe = true,
+                    score = 0,
+                    title = "資料格式錯誤",
+                    reasons = listOf("API 回傳了非 JSON 格式的資料", e.message ?: "解析失敗")
+                )
+            } catch (e: java.net.SocketTimeoutException) {
+                Log.e("API_ERROR", "SocketTimeoutException: ${e.message}")
+                resultData = ScanResult(
+                    isSafe = true,
+                    score = 0,
+                    title = "連線逾時",
+                    reasons = listOf("伺服器回應太慢", "請稍後再試")
+                )
             } catch (e: Exception) {
                 Log.e("API_ERROR", "Error: ${e.message}")
                 resultData = ScanResult(
                     isSafe = true,
                     score = 0,
                     title = "連線錯誤",
-                    reasons = listOf("無法連線至伺服器", e.message ?: "未知錯誤")
+                    reasons = listOf("無法連線至伺服器", "${e.javaClass.simpleName}: ${e.message}")
                 )
             }
             step = ScreenStep.RESULT
