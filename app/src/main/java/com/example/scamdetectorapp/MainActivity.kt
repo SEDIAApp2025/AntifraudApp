@@ -34,6 +34,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.automirrored.outlined.Message
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import android.util.Log
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -137,18 +143,21 @@ fun MainAppScreen() {
         Box(modifier = Modifier.padding(innerPadding)) {
             when (currentTab) {
                 "網址" -> GenericDetectionFlow(
+                    mode = DetectionMode.URL,
                     title = "檢測詐騙網址",
                     placeholder = "貼上網址，例如 https://...",
                     desc = "支援檢查釣魚網站、假冒連結",
                     keyboardType = KeyboardType.Uri
                 )
                 "電話" -> GenericDetectionFlow(
+                    mode = DetectionMode.PHONE,
                     title = "檢測詐騙電話",
                     placeholder = "輸入電話號碼 (如 0912...)",
                     desc = "檢查常見詐騙客服、假警方電話",
                     keyboardType = KeyboardType.Phone
                 )
                 "簡訊" -> GenericDetectionFlow(
+                    mode = DetectionMode.TEXT,
                     title = "檢測詐騙簡訊",
                     placeholder = "貼上簡訊內容...",
                     desc = "分析關鍵字、假連結、催款語法",
@@ -202,6 +211,7 @@ fun CustomBottomBar(currentTab: String, onTabSelected: (String) -> Unit) {
 // ==================== 4. 核心檢測流程 ====================
 
 enum class ScreenStep { INPUT, SCANNING, RESULT }
+enum class DetectionMode { URL, PHONE, TEXT }
 
 data class ScanResult(
     val isSafe: Boolean,
@@ -212,6 +222,7 @@ data class ScanResult(
 
 @Composable
 fun GenericDetectionFlow(
+    mode: DetectionMode,
     title: String,
     placeholder: String,
     desc: String,
@@ -231,14 +242,124 @@ fun GenericDetectionFlow(
 
     LaunchedEffect(step) {
         if (step == ScreenStep.SCANNING) {
-            delay(2000)
-            val isRisk = inputText.contains("123") || inputText.length > 20
-            resultData = ScanResult(
-                isSafe = !isRisk,
-                score = if (isRisk) 88 else 10,
-                title = if (isRisk) "高風險威脅" else "安全內容",
-                reasons = if (isRisk) listOf("包含黑名單關鍵字", "可疑的發送來源", "急迫性誘導語氣") else listOf("無惡意連結", "正規網域", "無詐騙特徵")
-            )
+            try {
+                val retrofit = Retrofit.Builder()
+                    .baseUrl("https://antifraud-gateway.lyc-dev.workers.dev/")
+                    .addConverterFactory(GsonConverterFactory.create())
+                    .build()
+
+                val antiFraudApi = retrofit.create(AntiFraudApi::class.java)
+                val gson = Gson()
+                var isRisk = false
+                val reasons = mutableListOf<String>()
+
+                val response = when (mode) {
+                    DetectionMode.PHONE -> antiFraudApi.getData(
+                        apiKey = BuildConfig.CLOUDFLARE_API_KEY,
+                        phoneNumber = inputText
+                    )
+                    DetectionMode.URL -> antiFraudApi.getUrlCheck(
+                        apiKey = BuildConfig.CLOUDFLARE_API_KEY,
+                        url = inputText
+                    )
+                    DetectionMode.TEXT -> antiFraudApi.postAiCheck(
+                        apiKey = BuildConfig.CLOUDFLARE_API_KEY,
+                        body = AiCheckRequest(text = inputText)
+                    )
+                }
+
+                if (response.success) {
+                    val jsonElement = response.data
+
+                    when (mode) {
+                        DetectionMode.PHONE -> {
+                            if (jsonElement.isJsonArray) {
+                                val listType = object : TypeToken<List<FraudReport>>() {}.type
+                                val reports: List<FraudReport> = gson.fromJson(jsonElement, listType)
+                                if (reports.isNotEmpty()) {
+                                    isRisk = true
+                                    reasons.add("資料庫中有紀錄")
+                                    reports.forEach { report ->
+                                        report.description?.let { reasons.add(it) }
+                                    }
+                                }
+                            } else if (jsonElement.isJsonObject) {
+                                val jsonObj = jsonElement.asJsonObject
+                                val message = if (jsonObj.has("message")) jsonObj.get("message").asString else ""
+                                if (!message.contains("no record", ignoreCase = true)) {
+                                    val report: FraudReport = gson.fromJson(jsonElement, FraudReport::class.java)
+                                    if (!report.id.isNullOrEmpty() || !report.riskLevel.isNullOrEmpty()) {
+                                        isRisk = true
+                                        reasons.add("資料庫中有紀錄")
+                                        report.description?.let { reasons.add(it) }
+                                    }
+                                }
+                            }
+                        }
+                        DetectionMode.URL -> {
+                            if (jsonElement.isJsonObject) {
+                                val jsonObj = jsonElement.asJsonObject
+                                val riskLevel = if (jsonObj.has("riskLevel")) jsonObj.get("riskLevel").asString else ""
+                                val description = if (jsonObj.has("description")) jsonObj.get("description").asString else ""
+                                val threatType = if (jsonObj.has("threatType")) jsonObj.get("threatType").asString else ""
+
+                                if (riskLevel.equals("high", ignoreCase = true) || riskLevel.equals("medium", ignoreCase = true)) {
+                                    isRisk = true
+                                    reasons.add("風險等級: $riskLevel")
+                                    if (threatType.isNotEmpty()) reasons.add("威脅類型: $threatType")
+                                    if (description.isNotEmpty()) reasons.add(description)
+                                }
+                            }
+                        }
+                        DetectionMode.TEXT -> {
+                            if (jsonElement.isJsonObject) {
+                                val jsonObj = jsonElement.asJsonObject
+                                val riskLevel = if (jsonObj.has("riskLevel")) jsonObj.get("riskLevel").asString else ""
+                                val description = if (jsonObj.has("description")) jsonObj.get("description").asString else ""
+                                val suggestion = if (jsonObj.has("suggestion")) jsonObj.get("suggestion").asString else ""
+
+                                if (riskLevel.equals("high", ignoreCase = true) || riskLevel.equals("medium", ignoreCase = true)) {
+                                    isRisk = true
+                                    reasons.add("風險等級: $riskLevel")
+                                    if (description.isNotEmpty()) reasons.add(description)
+                                    if (suggestion.isNotEmpty()) reasons.add("建議: $suggestion")
+                                }
+                            }
+                        }
+                    }
+
+                    if (!isRisk) {
+                        reasons.add("無詐騙特徵")
+                        reasons.add("正規網域/號碼/內容")
+                    }
+                    
+                    if (reasons.isEmpty()) {
+                         reasons.add("無詳細資訊")
+                    }
+
+                    resultData = ScanResult(
+                        isSafe = !isRisk,
+                        score = if (isRisk) 30 else 95,
+                        title = if (isRisk) "高風險威脅" else "安全內容",
+                        reasons = reasons
+                    )
+                } else {
+                    resultData = ScanResult(
+                        isSafe = true,
+                        score = 0,
+                        title = "查詢失敗",
+                        reasons = listOf("API 回傳失敗: ${response.version}")
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e("API_ERROR", "Error: ${e.message}")
+                resultData = ScanResult(
+                    isSafe = true,
+                    score = 0,
+                    title = "連線錯誤",
+                    reasons = listOf("無法連線至伺服器", e.message ?: "未知錯誤")
+                )
+            }
             step = ScreenStep.RESULT
         }
     }

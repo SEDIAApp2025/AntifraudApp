@@ -1,8 +1,10 @@
-package com.example.myapplication
+package com.example.scamdetectorapp
 
 import com.google.gson.JsonElement
+import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Header
+import retrofit2.http.POST
 import retrofit2.http.Query
 
 /**
@@ -13,6 +15,10 @@ data class FraudReport(
     val phoneNumber: String? = null,
     val riskLevel: String? = null,
     val description: String? = null
+)
+
+data class AiCheckRequest(
+    val text: String
 )
 
 /**
@@ -35,5 +41,17 @@ interface AntiFraudApi {
         @Header("x-api-key") apiKey: String,
         @Query("phoneNumber") phoneNumber: String? = null,
         @Query("riskLevel") riskLevel: String? = null
+    ): AntiFraudResponse
+
+    @GET("api/url-check")
+    suspend fun getUrlCheck(
+        @Header("x-api-key") apiKey: String,
+        @Query("url") url: String
+    ): AntiFraudResponse
+
+    @POST("api/ai-check")
+    suspend fun postAiCheck(
+        @Header("x-api-key") apiKey: String,
+        @Body body: AiCheckRequest
     ): AntiFraudResponse
 }
