@@ -14,3 +14,10 @@ find_library(
 target_link_libraries(
         scamdetectorapp
         ${log-lib})
+
+# 將 Gradle 傳入的 API_KEY 定義為 C++ 的 Preprocessor Definition
+if(NOT DEFINED API_KEY)
+    set(API_KEY "")
+endif()
+# 使用跳脫引號 \" 包裹 Key，確保 C++ 編譯器將其視為字串常值
+target_compile_definitions(scamdetectorapp PRIVATE API_KEY=\"${API_KEY}\")
