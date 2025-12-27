@@ -21,26 +21,39 @@ sealed interface ScanUiState {
     data class Error(val message: String, val title: String = "錯誤") : ScanUiState
 }
 
-class MainViewModel(
-    private val repository: AntiFraudRepository
-) : ViewModel() {
+class MainViewModel : ViewModel() {
+    private val repository = AntiFraudRepository()
 
-    private val _uiState = MutableStateFlow<ScanUiState>(ScanUiState.Idle)
-    val uiState: StateFlow<ScanUiState> = _uiState.asStateFlow()
+    private val _urlState = MutableStateFlow<ScanUiState>(ScanUiState.Idle)
+    private val _phoneState = MutableStateFlow<ScanUiState>(ScanUiState.Idle)
+    private val _textState = MutableStateFlow<ScanUiState>(ScanUiState.Idle)
 
-    fun resetState() {
-        _uiState.value = ScanUiState.Idle
+    fun getState(mode: DetectionMode): StateFlow<ScanUiState> = when (mode) {
+        DetectionMode.URL -> _urlState.asStateFlow()
+        DetectionMode.PHONE -> _phoneState.asStateFlow()
+        DetectionMode.TEXT -> _textState.asStateFlow()
+    }
+
+    private fun getMutableState(mode: DetectionMode): MutableStateFlow<ScanUiState> = when (mode) {
+        DetectionMode.URL -> _urlState
+        DetectionMode.PHONE -> _phoneState
+        DetectionMode.TEXT -> _textState
+    }
+
+    fun resetState(mode: DetectionMode) {
+        getMutableState(mode).value = ScanUiState.Idle
     }
 
     fun scan(mode: DetectionMode, input: String) {
-        _uiState.value = ScanUiState.Loading
-        val trimmedInput = input.trim()
+        val stateFlow = getMutableState(mode)
+        stateFlow.value = ScanUiState.Loading
+        
         viewModelScope.launch {
             val result = repository.scan(mode, trimmedInput)
             result.fold(
                 onSuccess = { scanResult ->
                     val uiModel = mapToUiModel(scanResult)
-                    _uiState.value = ScanUiState.Success(uiModel)
+                    stateFlow.value = ScanUiState.Success(uiModel)
                 },
                 onFailure = { e ->
                     val (title, message) = when (e) {
@@ -49,7 +62,7 @@ class MainViewModel(
                         is SocketTimeoutException -> "連線逾時" to "伺服器回應太慢，請稍後再試"
                         else -> "錯誤" to (e.message ?: "發生未知錯誤")
                     }
-                    _uiState.value = ScanUiState.Error(message, title)
+                    stateFlow.value = ScanUiState.Error(message, title)
                 }
             )
         }

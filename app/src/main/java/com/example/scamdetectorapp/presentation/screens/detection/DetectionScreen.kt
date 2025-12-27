@@ -27,6 +27,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.scamdetectorapp.R
 import com.example.scamdetectorapp.domain.model.DetectionMode
@@ -34,6 +35,12 @@ import com.example.scamdetectorapp.presentation.model.ScanUiModel
 import com.example.scamdetectorapp.presentation.viewmodel.MainViewModel
 import com.example.scamdetectorapp.presentation.viewmodel.ScanUiState
 
+/**
+ * 定義畫面顯示的三個階段
+ * INPUT: 輸入內容階段
+ * SCANNING: 正在連網檢測階段
+ * RESULT: 顯示檢測報告階段
+ */
 enum class ScreenStep { INPUT, SCANNING, RESULT, ERROR }
 
 @Composable
@@ -46,30 +53,46 @@ fun GenericDetectionFlow(
     isMultiLine: Boolean = false,
     viewModel: MainViewModel = viewModel(factory = MainViewModel.Factory)
 ) {
+    // 獲取 ViewModel 實例
+    val viewModel: MainViewModel = viewModel()
+    
+    // UI 內部導航步驟狀態
     var step by remember { mutableStateOf(ScreenStep.INPUT) }
     var inputText by remember { mutableStateOf("") }
     val focusManager = LocalFocusManager.current
-    val uiState by viewModel.uiState.collectAsState()
+    
+    // 【狀態隔離】根據模式監聽獨立的 UI 狀態流，避免三個功能頁面互相干擾
+    val uiState by viewModel.getState(mode).collectAsStateWithLifecycle()
 
+    /**
+     * 副作用監聽：當 ViewModel 的資料狀態改變時，驅動 UI 切換到對應的步驟
+     */
     LaunchedEffect(uiState) {
         when (uiState) {
             is ScanUiState.Loading -> step = ScreenStep.SCANNING
             is ScanUiState.Success -> step = ScreenStep.RESULT
             is ScanUiState.Error -> step = ScreenStep.ERROR
             is ScanUiState.Idle -> {
+                // 如果狀態回到閒置，且目前不在輸入頁，則強行跳回輸入頁
                 if (step != ScreenStep.INPUT) step = ScreenStep.INPUT
             }
         }
     }
 
+    /**
+     * 執行檢測：收起鍵盤並觸發 ViewModel 的 scan 邏輯
+     */
     fun startScan() {
         focusManager.clearFocus()
         viewModel.scan(mode, inputText)
     }
 
+    /**
+     * 重置：清空輸入並通知 ViewModel 回歸閒置狀態
+     */
     fun reset() {
         inputText = ""
-        viewModel.resetState()
+        viewModel.resetState(mode)
         step = ScreenStep.INPUT
     }
 
@@ -78,6 +101,7 @@ fun GenericDetectionFlow(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
+        // 第一階段：輸入頁面
         AnimatedVisibility(visible = step == ScreenStep.INPUT, enter = fadeIn(), exit = fadeOut()) {
             InputScreen(
                 title = title,
@@ -91,10 +115,12 @@ fun GenericDetectionFlow(
             )
         }
 
+        // 第二階段：掃描中動畫頁面
         AnimatedVisibility(visible = step == ScreenStep.SCANNING, enter = fadeIn(), exit = fadeOut()) {
-            ScanningScreen(onCancel = { viewModel.resetState() })
+            ScanningScreen(onCancel = { viewModel.resetState(mode) })
         }
 
+        // 第三階段：檢測結果頁面
         AnimatedVisibility(visible = step == ScreenStep.RESULT, enter = fadeIn(), exit = fadeOut()) {
             if (uiState is ScanUiState.Success) {
                 FraudResultScreen(
@@ -165,6 +191,9 @@ fun ErrorScreen(title: String, message: String, onBack: () -> Unit) {
     }
 }
 
+/**
+ * 輸入頁面組件
+ */
 @Composable
 fun InputScreen(
     title: String,
@@ -260,6 +289,9 @@ fun InputScreen(
     }
 }
 
+/**
+ * 掃描動畫頁面組件
+ */
 @Composable
 fun ScanningScreen(onCancel: () -> Unit) {
     val primaryColor = MaterialTheme.colorScheme.primary
