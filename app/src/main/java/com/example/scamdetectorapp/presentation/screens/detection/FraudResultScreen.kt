@@ -143,7 +143,7 @@ fun FraudResultScreen(originalText: String, result: ScanUiModel, onBack: () -> U
 
         Spacer(Modifier.height(32.dp))
 
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(60.dp)) {
             Button(
                 onClick = onBack,
                 modifier = Modifier.weight(1f).height(50.dp),

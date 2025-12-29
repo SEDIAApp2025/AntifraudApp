@@ -56,7 +56,9 @@ fun GenericDetectionFlow(
 ) {
     // UI 內部導航步驟狀態
     var step by remember { mutableStateOf(ScreenStep.INPUT) }
-    var inputText by remember { mutableStateOf("") }
+    
+    // 【狀態提升】將輸入內容交由 ViewModel 管理，避免切換分頁時遺失
+    val inputText by viewModel.getInput(mode).collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
     
     // 【狀態隔離】根據模式監聽獨立的 UI 狀態流，避免三個功能頁面互相干擾
@@ -89,7 +91,7 @@ fun GenericDetectionFlow(
      * 重置：清空輸入並通知 ViewModel 回歸閒置狀態
      */
     fun reset() {
-        inputText = ""
+        viewModel.setInput(mode, "") // 使用 ViewModel 管理輸入狀態
         viewModel.resetState(mode)
         step = ScreenStep.INPUT
     }
@@ -106,7 +108,7 @@ fun GenericDetectionFlow(
                 desc = desc,
                 placeholder = placeholder,
                 value = inputText,
-                onValueChange = { inputText = it },
+                onValueChange = { viewModel.setInput(mode, it) }, // 更新 ViewModel 中的狀態
                 onScan = { if (inputText.isNotBlank()) startScan() },
                 keyboardType = keyboardType,
                 isMultiLine = isMultiLine
@@ -319,4 +321,3 @@ fun ScanningScreen(onCancel: () -> Unit) {
         }
     }
 }
-

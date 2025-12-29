@@ -15,7 +15,7 @@ import com.example.scamdetectorapp.presentation.screens.detection.GenericDetecti
 
 @Composable
 fun MainAppScreen() {
-    var currentTab by remember { mutableStateOf("簡訊") }
+    var currentTab by remember { mutableStateOf("網址") }
     val backgroundColor = MaterialTheme.colorScheme.background
 
     Scaffold(
