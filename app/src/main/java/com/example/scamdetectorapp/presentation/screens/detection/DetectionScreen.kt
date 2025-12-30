@@ -4,11 +4,11 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
@@ -17,13 +17,18 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -31,16 +36,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.scamdetectorapp.R
 import com.example.scamdetectorapp.domain.model.DetectionMode
-import com.example.scamdetectorapp.presentation.model.ScanUiModel
 import com.example.scamdetectorapp.presentation.viewmodel.MainViewModel
 import com.example.scamdetectorapp.presentation.viewmodel.ScanUiState
+import kotlinx.coroutines.delay
 
 /**
  * 定義畫面顯示的四個階段
- * INPUT: 輸入內容階段
- * SCANNING: 正在連網檢測階段
- * RESULT: 顯示檢測報告階段
- * ERROR: 檢測過程中發生錯誤或失敗時的階段
  */
 enum class ScreenStep { INPUT, SCANNING, RESULT, ERROR }
 
@@ -54,12 +55,12 @@ fun GenericDetectionFlow(
     isMultiLine: Boolean = false,
     viewModel: MainViewModel = viewModel(factory = MainViewModel.Factory)
 ) {
-    
-    // 【狀態隔離】根據模式監聽獨立的 UI 狀態流，避免三個功能頁面互相干擾
     val stateFlow = viewModel.getState(mode)
     val uiState by stateFlow.collectAsStateWithLifecycle()
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
 
-    var step by remember(mode) { // 當 mode 改變時，重新計算初始 step
+    var step by remember(mode) {
         val initialStep = when (stateFlow.value) {
             is ScanUiState.Loading -> ScreenStep.SCANNING
             is ScanUiState.Success -> ScreenStep.RESULT
@@ -69,37 +70,45 @@ fun GenericDetectionFlow(
         mutableStateOf(initialStep)
     }
 
-    // 【狀態提升】監聽輸入內容
-    val inputText by viewModel.getInput(mode).collectAsStateWithLifecycle()
-    val focusManager = LocalFocusManager.current
-    /**
-     * 副作用監聽：當 ViewModel 的資料狀態改變時，驅動 UI 切換到對應的步驟
-     */
+    val viewModelInput by viewModel.getInput(mode).collectAsStateWithLifecycle()
+    
+    // 【關鍵修正】使用 TextFieldValue 替代 String，以支援實體鍵盤中文組合輸入
+    var localTextValue by remember(mode) { mutableStateOf(TextFieldValue(viewModelInput)) }
+    
+    LaunchedEffect(viewModelInput) {
+        if (localTextValue.text != viewModelInput) {
+            localTextValue = TextFieldValue(viewModelInput)
+        }
+    }
+
+    // 當分頁切換（mode 改變）或元件銷毀時，確保收起鍵盤
+    DisposableEffect(mode) {
+        onDispose {
+            focusManager.clearFocus()
+            keyboardController?.hide()
+        }
+    }
+
     LaunchedEffect(uiState) {
         when (uiState) {
             is ScanUiState.Loading -> step = ScreenStep.SCANNING
             is ScanUiState.Success -> step = ScreenStep.RESULT
             is ScanUiState.Error -> step = ScreenStep.ERROR
             is ScanUiState.Idle -> {
-                // 如果狀態回到閒置，且目前不在輸入頁，則強行跳回輸入頁
                 if (step != ScreenStep.INPUT) step = ScreenStep.INPUT
             }
         }
     }
 
-    /**
-     * 執行檢測：收起鍵盤並觸發 ViewModel 的 scan 邏輯
-     */
     fun startScan() {
         focusManager.clearFocus()
-        viewModel.scan(mode, inputText)
+        keyboardController?.hide()
+        viewModel.scan(mode, localTextValue.text)
     }
 
-    /**
-     * 重置：清空輸入並通知 ViewModel 回歸閒置狀態
-     */
     fun reset() {
-        viewModel.setInput(mode, "") // 使用 ViewModel 管理輸入狀態
+        viewModel.setInput(mode, "")
+        localTextValue = TextFieldValue("")
         viewModel.resetState(mode)
         step = ScreenStep.INPUT
     }
@@ -108,31 +117,42 @@ fun GenericDetectionFlow(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            // 點擊背景收起鍵盤
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = {
+                    focusManager.clearFocus()
+                    keyboardController?.hide()
+                })
+            }
     ) {
-        // 第一階段：輸入頁面
         AnimatedVisibility(visible = step == ScreenStep.INPUT, enter = fadeIn(), exit = fadeOut()) {
             InputScreen(
                 title = title,
                 desc = desc,
                 placeholder = placeholder,
-                value = inputText,
-                onValueChange = { viewModel.setInput(mode, it) }, // 更新 ViewModel 中的狀態
-                onScan = { if (inputText.isNotBlank()) startScan() },
-                keyboardType = keyboardType,
+                value = localTextValue,
+                onValueChange = {
+                    localTextValue = it
+                    viewModel.setInput(mode, it.text)
+                },
+                onScan = { if (localTextValue.text.isNotBlank()) startScan() },
+                keyboardType = when (mode) {
+                    DetectionMode.URL -> KeyboardType.Uri
+                    DetectionMode.PHONE -> KeyboardType.Number
+                    DetectionMode.TEXT -> KeyboardType.Text
+                },
                 isMultiLine = isMultiLine
             )
         }
 
-        // 第二階段：掃描中動畫頁面
         AnimatedVisibility(visible = step == ScreenStep.SCANNING, enter = fadeIn(), exit = fadeOut()) {
             ScanningScreen(onCancel = { viewModel.resetState(mode) })
         }
 
-        // 第三階段：檢測結果頁面
         AnimatedVisibility(visible = step == ScreenStep.RESULT, enter = fadeIn(), exit = fadeOut()) {
             if (uiState is ScanUiState.Success) {
                 FraudResultScreen(
-                    originalText = inputText,
+                    originalText = localTextValue.text,
                     result = (uiState as ScanUiState.Success).result,
                     onBack = { reset() }
                 )
@@ -199,26 +219,31 @@ fun ErrorScreen(title: String, message: String, onBack: () -> Unit) {
     }
 }
 
-/**
- * 輸入頁面組件
- */
 @Composable
 fun InputScreen(
     title: String,
     desc: String,
     placeholder: String,
-    value: String,
-    onValueChange: (String) -> Unit,
+    value: TextFieldValue,
+    onValueChange: (TextFieldValue) -> Unit,
     onScan: () -> Unit,
     keyboardType: KeyboardType,
     isMultiLine: Boolean
 ) {
     val clipboardManager = LocalClipboardManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
     val primaryColor = MaterialTheme.colorScheme.primary
     val textWhite = MaterialTheme.colorScheme.onBackground
     val textGrey = colorResource(R.color.scam_text_grey)
     val surfaceColor = MaterialTheme.colorScheme.surface
     val backgroundColor = MaterialTheme.colorScheme.background
+
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        delay(300) // 延遲確保實體鍵盤與動畫就緒
+        keyboardController?.hide()
+    }
 
     Column(
         modifier = Modifier
@@ -245,7 +270,8 @@ fun InputScreen(
                     placeholder = { Text(placeholder, color = Color.Gray) },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(if (isMultiLine) 150.dp else 60.dp),
+                        .height(if (isMultiLine) 150.dp else 60.dp)
+                        .focusRequester(focusRequester),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = primaryColor,
                         unfocusedBorderColor = Color.Transparent,
@@ -253,11 +279,21 @@ fun InputScreen(
                         unfocusedTextColor = textWhite,
                         focusedContainerColor = backgroundColor,
                         unfocusedContainerColor = backgroundColor,
-                        disabledContainerColor = backgroundColor,
-                        errorContainerColor = backgroundColor
                     ),
                     shape = RoundedCornerShape(12.dp),
-                    keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = ImeAction.Done),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = keyboardType,
+                        imeAction = ImeAction.Done
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onDone = {
+                            if (value.text.isNotBlank()) onScan()
+                            else {
+                                focusManager.clearFocus()
+                                keyboardController?.hide()
+                            }
+                        }
+                    ),
                     singleLine = !isMultiLine
                 )
 
@@ -265,7 +301,7 @@ fun InputScreen(
 
                 OutlinedButton(
                     onClick = {
-                        clipboardManager.getText()?.text?.let { onValueChange(it) }
+                        clipboardManager.getText()?.text?.let { onValueChange(TextFieldValue(it)) }
                     },
                     modifier = Modifier.align(Alignment.End),
                     border = androidx.compose.foundation.BorderStroke(1.dp, primaryColor)
@@ -281,7 +317,7 @@ fun InputScreen(
 
         Button(
             onClick = onScan,
-            enabled = value.isNotBlank(),
+            enabled = value.text.isNotBlank(),
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
@@ -297,9 +333,6 @@ fun InputScreen(
     }
 }
 
-/**
- * 掃描動畫頁面組件
- */
 @Composable
 fun ScanningScreen(onCancel: () -> Unit) {
     val primaryColor = MaterialTheme.colorScheme.primary
