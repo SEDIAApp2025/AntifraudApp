@@ -54,16 +54,24 @@ fun GenericDetectionFlow(
     isMultiLine: Boolean = false,
     viewModel: MainViewModel = viewModel(factory = MainViewModel.Factory)
 ) {
-    // UI 內部導航步驟狀態
-    var step by remember { mutableStateOf(ScreenStep.INPUT) }
-    
-    // 【狀態提升】將輸入內容交由 ViewModel 管理，避免切換分頁時遺失
-    val inputText by viewModel.getInput(mode).collectAsStateWithLifecycle()
-    val focusManager = LocalFocusManager.current
     
     // 【狀態隔離】根據模式監聽獨立的 UI 狀態流，避免三個功能頁面互相干擾
-    val uiState by viewModel.getState(mode).collectAsStateWithLifecycle()
+    val stateFlow = viewModel.getState(mode)
+    val uiState by stateFlow.collectAsStateWithLifecycle()
 
+    var step by remember(mode) { // 當 mode 改變時，重新計算初始 step
+        val initialStep = when (stateFlow.value) {
+            is ScanUiState.Loading -> ScreenStep.SCANNING
+            is ScanUiState.Success -> ScreenStep.RESULT
+            is ScanUiState.Error -> ScreenStep.ERROR
+            else -> ScreenStep.INPUT
+        }
+        mutableStateOf(initialStep)
+    }
+
+    // 【狀態提升】監聽輸入內容
+    val inputText by viewModel.getInput(mode).collectAsStateWithLifecycle()
+    val focusManager = LocalFocusManager.current
     /**
      * 副作用監聽：當 ViewModel 的資料狀態改變時，驅動 UI 切換到對應的步驟
      */

@@ -28,6 +28,11 @@ class MainViewModel(private val repository: AntiFraudRepository) : ViewModel() {
     private val _phoneState = MutableStateFlow<ScanUiState>(ScanUiState.Idle)
     private val _textState = MutableStateFlow<ScanUiState>(ScanUiState.Idle)
 
+    // 將 asStateFlow() 的結果快取起來，避免重複建立物件
+    val urlState = _urlState.asStateFlow()
+    val phoneState = _phoneState.asStateFlow()
+    val textState = _textState.asStateFlow()
+
     // 新增：儲存各模式的輸入內容，避免切換分頁時遺失
     private val _urlInput = MutableStateFlow("")
     private val _phoneInput = MutableStateFlow("")
