@@ -156,7 +156,7 @@ fun FraudResultScreen(originalText: String, result: ScanUiModel, onBack: () -> U
 
             Spacer(Modifier.height(32.dp))
 
-            Row(horizontalArrangement = Arrangement.spacedBy(60.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Button(
                     onClick = onBack,
                     modifier = Modifier.weight(1f).height(50.dp),
@@ -230,9 +230,15 @@ fun FraudResultScreen(originalText: String, result: ScanUiModel, onBack: () -> U
 
                     Button(
                         onClick = {
-                            Toast.makeText(context, "送出成功", Toast.LENGTH_SHORT).show()
-                            showSheet = false
-                            onBack()
+                            if (selectedType.isNotBlank()){
+                                // 這裡未來可以加入回報的實作
+                                Toast.makeText(context, "送出成功", Toast.LENGTH_SHORT).show()
+                                showSheet = false
+                                onBack()
+                            }
+                            else{
+                                Toast.makeText(context, "請先選擇詐騙類型", Toast.LENGTH_SHORT).show()
+                            }
                         },
                         modifier = Modifier
                             .fillMaxWidth()

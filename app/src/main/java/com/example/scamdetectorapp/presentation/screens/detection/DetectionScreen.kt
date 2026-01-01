@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
@@ -38,7 +39,6 @@ import com.example.scamdetectorapp.R
 import com.example.scamdetectorapp.domain.model.DetectionMode
 import com.example.scamdetectorapp.presentation.viewmodel.MainViewModel
 import com.example.scamdetectorapp.presentation.viewmodel.ScanUiState
-import kotlinx.coroutines.delay
 
 /**
  * 定義畫面顯示的四個階段
@@ -71,10 +71,10 @@ fun GenericDetectionFlow(
     }
 
     val viewModelInput by viewModel.getInput(mode).collectAsStateWithLifecycle()
-    
+
     // 【關鍵修正】使用 TextFieldValue 替代 String，以支援實體鍵盤中文組合輸入
     var localTextValue by remember(mode) { mutableStateOf(TextFieldValue(viewModelInput)) }
-    
+
     LaunchedEffect(viewModelInput) {
         if (localTextValue.text != viewModelInput) {
             localTextValue = TextFieldValue(viewModelInput)
@@ -238,12 +238,8 @@ fun InputScreen(
     val textGrey = colorResource(R.color.scam_text_grey)
     val surfaceColor = MaterialTheme.colorScheme.surface
     val backgroundColor = MaterialTheme.colorScheme.background
-
     val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) {
-        delay(300) // 延遲確保實體鍵盤與動畫就緒
-        keyboardController?.hide()
-    }
+
 
     Column(
         modifier = Modifier
@@ -279,11 +275,12 @@ fun InputScreen(
                         unfocusedTextColor = textWhite,
                         focusedContainerColor = backgroundColor,
                         unfocusedContainerColor = backgroundColor,
+                        disabledContainerColor = backgroundColor,
+                        errorContainerColor = backgroundColor,
                     ),
                     shape = RoundedCornerShape(12.dp),
                     keyboardOptions = KeyboardOptions(
-                        keyboardType = keyboardType,
-                        imeAction = ImeAction.Done
+                        keyboardType = keyboardType
                     ),
                     keyboardActions = KeyboardActions(
                         onDone = {

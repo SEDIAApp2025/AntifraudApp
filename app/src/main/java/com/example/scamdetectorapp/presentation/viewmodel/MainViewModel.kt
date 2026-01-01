@@ -23,25 +23,30 @@ sealed interface ScanUiState {
 
 // 修復：增加建構子參數以符合 Factory 的呼叫
 class MainViewModel(private val repository: AntiFraudRepository) : ViewModel() {
-
+    // 儲存各模式的【狀態】內容，避免切換分頁時遺失
     private val _urlState = MutableStateFlow<ScanUiState>(ScanUiState.Idle)
     private val _phoneState = MutableStateFlow<ScanUiState>(ScanUiState.Idle)
     private val _textState = MutableStateFlow<ScanUiState>(ScanUiState.Idle)
+
+    // 儲存各模式的【輸入】內容，避免切換分頁時遺失
+    private val _urlInput = MutableStateFlow("")
+    private val _phoneInput = MutableStateFlow("")
+    private val _textInput = MutableStateFlow("")
 
     // 將 asStateFlow() 的結果快取起來，避免重複建立物件
     val urlState = _urlState.asStateFlow()
     val phoneState = _phoneState.asStateFlow()
     val textState = _textState.asStateFlow()
 
-    // 新增：儲存各模式的輸入內容，避免切換分頁時遺失
-    private val _urlInput = MutableStateFlow("")
-    private val _phoneInput = MutableStateFlow("")
-    private val _textInput = MutableStateFlow("")
+    // 【新增快取】在類別層級只呼叫一次 asStateFlow()
+    val urlInput = _urlInput.asStateFlow()
+    val phoneInput = _phoneInput.asStateFlow()
+    val textInput = _textInput.asStateFlow()
 
     fun getState(mode: DetectionMode): StateFlow<ScanUiState> = when (mode) {
-        DetectionMode.URL -> _urlState.asStateFlow()
-        DetectionMode.PHONE -> _phoneState.asStateFlow()
-        DetectionMode.TEXT -> _textState.asStateFlow()
+        DetectionMode.URL -> urlState
+        DetectionMode.PHONE -> phoneState
+        DetectionMode.TEXT -> textState
     }
 
     private fun getMutableState(mode: DetectionMode): MutableStateFlow<ScanUiState> = when (mode) {
@@ -51,9 +56,9 @@ class MainViewModel(private val repository: AntiFraudRepository) : ViewModel() {
     }
 
     fun getInput(mode: DetectionMode): StateFlow<String> = when (mode) {
-        DetectionMode.URL -> _urlInput.asStateFlow()
-        DetectionMode.PHONE -> _phoneInput.asStateFlow()
-        DetectionMode.TEXT -> _textInput.asStateFlow()
+        DetectionMode.URL -> urlInput
+        DetectionMode.PHONE -> phoneInput
+        DetectionMode.TEXT -> textInput
     }
 
     fun setInput(mode: DetectionMode, text: String) {
