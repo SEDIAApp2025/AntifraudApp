@@ -26,7 +26,7 @@ fun CustomBottomBar(currentTab: String, onTabSelected: (String) -> Unit) {
         containerColor = surfaceColor,
         tonalElevation = 8.dp
     ) {
-        // 更新列表：加入「首頁」
+        // 更新列表：加入「首頁」，「新聞」頁面不加入導覽列
         val items = listOf(
             Triple("首頁", Icons.Filled.Home, Icons.Outlined.Home),
             Triple("網址", Icons.Filled.Public, Icons.Outlined.Public),

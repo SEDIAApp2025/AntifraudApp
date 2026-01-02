@@ -26,6 +26,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.scamdetectorapp.R
+import com.example.scamdetectorapp.data.repository.NewsRepository
+import com.example.scamdetectorapp.data.repository.NewsType
 
 /**
  * 首頁螢幕組件
@@ -118,7 +120,7 @@ fun HomeScreen(onNavigateTo: (String) -> Unit) {
 
         Spacer(modifier = Modifier.height(40.dp))
 
-        // --- 新增：防詐新聞預覽卡片 ---
+        // --- 防詐新聞預覽區塊 ---
         NewsPreviewSection(onClick = { onNavigateTo("新聞") })
         
         Spacer(modifier = Modifier.height(24.dp))
@@ -174,13 +176,16 @@ private fun FeatureCard(
 }
 
 /**
- * 新增：首頁底部的新聞預覽區塊
+ * 首頁底部的新聞預覽區塊
  */
 @Composable
 private fun NewsPreviewSection(onClick: () -> Unit) {
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
     val primaryColor = MaterialTheme.colorScheme.primary
     val textGrey = colorResource(R.color.scam_text_grey)
+
+    // 修改：從共用 Repository 取得前兩則新聞
+    val previewNews = NewsRepository.getPreviewNews()
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -199,28 +204,8 @@ private fun NewsPreviewSection(onClick: () -> Unit) {
             }
         }
 
-        // 預覽卡面區
-
-        data class NewsPreview(
-            val title: String,
-            val summary: String,
-            val icon: ImageVector
-        )
-
-        val newsPreviews = listOf(
-            NewsPreview(
-                title = "【查核】網傳連結「填寫7-ELEVEN問卷調查可抽1萬元」？",
-                summary = "近日網路流傳一個聲稱「7-ELEVEN問卷調查可抽1萬元」的網址...",
-                icon = Icons.Default.Newspaper
-            ),
-            NewsPreview(
-                title = "【165警訊】假買家騙賣家詐騙？",
-                summary = "在臉書上刊登出售球拍的廣告，就隨即有人聯繫表示想購買...",
-                icon = Icons.Default.DataThresholding
-            )
-        )
-
-        newsPreviews.forEachIndexed { index, preview ->
+        // 根據取得的資料動態渲染卡片
+        previewNews.forEachIndexed { index, news ->
             if (index > 0) {
                 Spacer(modifier = Modifier.height(10.dp))
             }
@@ -245,8 +230,10 @@ private fun NewsPreviewSection(onClick: () -> Unit) {
                             ),
                         contentAlignment = Alignment.Center
                     ) {
+                        // 根據新聞類型顯示不同的圖示
+                        val icon = if (news.type == NewsType.TREND) Icons.Default.DataThresholding else Icons.Default.Newspaper
                         Icon(
-                            preview.icon,
+                            icon,
                             contentDescription = null,
                             tint = primaryColor,
                             modifier = Modifier.size(24.dp)
@@ -257,7 +244,7 @@ private fun NewsPreviewSection(onClick: () -> Unit) {
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = preview.title,
+                            text = news.title,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = onSurfaceColor,
@@ -265,7 +252,7 @@ private fun NewsPreviewSection(onClick: () -> Unit) {
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
-                            text = preview.summary,
+                            text = news.summary,
                             fontSize = 13.sp,
                             color = textGrey,
                             maxLines = 1,
