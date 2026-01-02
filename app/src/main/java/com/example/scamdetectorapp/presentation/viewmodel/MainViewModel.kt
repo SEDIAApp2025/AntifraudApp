@@ -23,21 +23,50 @@ sealed interface ScanUiState {
 
 // 修復：增加建構子參數以符合 Factory 的呼叫
 class MainViewModel(private val repository: AntiFraudRepository) : ViewModel() {
-
+    // 儲存各模式的【狀態】內容，避免切換分頁時遺失
     private val _urlState = MutableStateFlow<ScanUiState>(ScanUiState.Idle)
     private val _phoneState = MutableStateFlow<ScanUiState>(ScanUiState.Idle)
     private val _textState = MutableStateFlow<ScanUiState>(ScanUiState.Idle)
 
+    // 儲存各模式的【輸入】內容，避免切換分頁時遺失
+    private val _urlInput = MutableStateFlow("")
+    private val _phoneInput = MutableStateFlow("")
+    private val _textInput = MutableStateFlow("")
+
+    // 將 asStateFlow() 的結果快取起來，避免重複建立物件
+    val urlState = _urlState.asStateFlow()
+    val phoneState = _phoneState.asStateFlow()
+    val textState = _textState.asStateFlow()
+
+    // 【新增快取】在類別層級只呼叫一次 asStateFlow()
+    val urlInput = _urlInput.asStateFlow()
+    val phoneInput = _phoneInput.asStateFlow()
+    val textInput = _textInput.asStateFlow()
+
     fun getState(mode: DetectionMode): StateFlow<ScanUiState> = when (mode) {
-        DetectionMode.URL -> _urlState.asStateFlow()
-        DetectionMode.PHONE -> _phoneState.asStateFlow()
-        DetectionMode.TEXT -> _textState.asStateFlow()
+        DetectionMode.URL -> urlState
+        DetectionMode.PHONE -> phoneState
+        DetectionMode.TEXT -> textState
     }
 
     private fun getMutableState(mode: DetectionMode): MutableStateFlow<ScanUiState> = when (mode) {
         DetectionMode.URL -> _urlState
         DetectionMode.PHONE -> _phoneState
         DetectionMode.TEXT -> _textState
+    }
+
+    fun getInput(mode: DetectionMode): StateFlow<String> = when (mode) {
+        DetectionMode.URL -> urlInput
+        DetectionMode.PHONE -> phoneInput
+        DetectionMode.TEXT -> textInput
+    }
+
+    fun setInput(mode: DetectionMode, text: String) {
+        when (mode) {
+            DetectionMode.URL -> _urlInput.value = text
+            DetectionMode.PHONE -> _phoneInput.value = text
+            DetectionMode.TEXT -> _textInput.value = text
+        }
     }
 
     fun resetState(mode: DetectionMode) {
@@ -47,7 +76,6 @@ class MainViewModel(private val repository: AntiFraudRepository) : ViewModel() {
     fun scan(mode: DetectionMode, input: String) {
         val stateFlow = getMutableState(mode)
         stateFlow.value = ScanUiState.Loading
-        val trimmedInput = input.trim()
         
         viewModelScope.launch {
             val result = repository.scan(mode, input.trim())
