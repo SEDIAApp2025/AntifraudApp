@@ -280,7 +280,9 @@ fun InputScreen(
                     ),
                     shape = RoundedCornerShape(12.dp),
                     keyboardOptions = KeyboardOptions(
-                        keyboardType = keyboardType
+                        keyboardType = keyboardType,
+                        imeAction = if(isMultiLine) ImeAction.Default else ImeAction.Done,
+                        autoCorrectEnabled = true
                     ),
                     keyboardActions = KeyboardActions(
                         onDone = {

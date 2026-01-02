@@ -5,8 +5,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import com.example.scamdetectorapp.domain.model.DetectionMode
@@ -15,7 +13,8 @@ import com.example.scamdetectorapp.presentation.screens.detection.GenericDetecti
 
 @Composable
 fun MainAppScreen() {
-    var currentTab by remember { mutableStateOf("網址") }
+    // 預設切換為「首頁」
+    var currentTab by remember { mutableStateOf("首頁") }
     val backgroundColor = MaterialTheme.colorScheme.background
 
     Scaffold(
@@ -26,7 +25,8 @@ fun MainAppScreen() {
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
             when (currentTab) {
-                "網址" -> key(DetectionMode.URL) { // 使用 key 來重置狀態
+                "首頁" -> HomeScreen(onNavigateTo = { currentTab = it })
+                "網址" -> key(DetectionMode.URL) {
                     GenericDetectionFlow(
                         mode = DetectionMode.URL,
                         title = "檢測詐騙網址",
@@ -35,7 +35,7 @@ fun MainAppScreen() {
                         keyboardType = KeyboardType.Uri
                     )
                 }
-                "電話" -> key(DetectionMode.PHONE) { // 使用 key 來重置狀態
+                "電話" -> key(DetectionMode.PHONE) {
                     GenericDetectionFlow(
                         mode = DetectionMode.PHONE,
                         title = "檢測詐騙電話",
@@ -44,7 +44,7 @@ fun MainAppScreen() {
                         keyboardType = KeyboardType.Phone
                     )
                 }
-                "簡訊" -> key(DetectionMode.TEXT) { // 使用 key 來重置狀態
+                "簡訊" -> key(DetectionMode.TEXT) {
                     GenericDetectionFlow(
                         mode = DetectionMode.TEXT,
                         title = "檢測詐騙簡訊",
