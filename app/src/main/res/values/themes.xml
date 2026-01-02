@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
-    <style name="Theme.ScamDetectorApp" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- 核心修正：將主主題的父項改為 DayNight，並顯式覆蓋亮色模式下的背景 -->
+    <style name="Theme.ScamDetectorApp" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- 這是關鍵：強制啟動時的視窗背景為深藍色，防止閃白 -->
+        <item name="android:windowBackground">@color/scam_background</item>
+        
+        <!-- 同步狀態列與導航列顏色 -->
+        <item name="android:statusBarColor">@color/scam_background</item>
+        <item name="android:navigationBarColor">@color/scam_background</item>
+        
+        <!-- 確保狀態列文字在深色背景下是亮的 -->
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
 </resources>

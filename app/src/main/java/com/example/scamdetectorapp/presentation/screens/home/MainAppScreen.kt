@@ -20,12 +20,17 @@ fun MainAppScreen() {
     Scaffold(
         containerColor = backgroundColor,
         bottomBar = {
+            // 如果當前是在新聞頁面，可以選擇隱藏 BottomBar 或保持顯示
+            // 這裡保持顯示，讓使用者隨時可以切換到其他功能
             CustomBottomBar(currentTab) { selected -> currentTab = selected }
         }
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
             when (currentTab) {
                 "首頁" -> HomeScreen(onNavigateTo = { currentTab = it })
+                
+                "新聞" -> NewsScreen(onBack = { currentTab = "首頁" })
+
                 "網址" -> key(DetectionMode.URL) {
                     GenericDetectionFlow(
                         mode = DetectionMode.URL,
