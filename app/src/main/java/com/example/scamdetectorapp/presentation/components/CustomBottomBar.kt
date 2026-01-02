@@ -3,8 +3,10 @@ package com.example.scamdetectorapp.presentation.components
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.automirrored.outlined.Message
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Phone
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material3.*
@@ -24,7 +26,9 @@ fun CustomBottomBar(currentTab: String, onTabSelected: (String) -> Unit) {
         containerColor = surfaceColor,
         tonalElevation = 8.dp
     ) {
+        // 更新列表：加入「首頁」，「新聞」頁面不加入導覽列
         val items = listOf(
+            Triple("首頁", Icons.Filled.Home, Icons.Outlined.Home),
             Triple("網址", Icons.Filled.Public, Icons.Outlined.Public),
             Triple("電話", Icons.Filled.Phone, Icons.Outlined.Phone),
             Triple("簡訊", Icons.AutoMirrored.Filled.Message, Icons.AutoMirrored.Outlined.Message)

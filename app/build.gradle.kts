@@ -78,10 +78,6 @@ android {
         // 3. 必須開啟 buildConfig 功能
         buildConfig = true
     }
-
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.14"
-    }
 }
 
 dependencies {
