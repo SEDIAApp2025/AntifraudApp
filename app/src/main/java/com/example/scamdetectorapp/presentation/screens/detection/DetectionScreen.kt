@@ -282,7 +282,7 @@ fun InputScreen(
                     keyboardOptions = KeyboardOptions(
                         keyboardType = keyboardType,
                         imeAction = if(isMultiLine) ImeAction.Default else ImeAction.Done,
-                        autoCorrectEnabled = true
+                        autoCorrect = true
                     ),
                     keyboardActions = KeyboardActions(
                         onDone = {

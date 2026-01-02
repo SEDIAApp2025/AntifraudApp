@@ -78,10 +78,6 @@ android {
         // 3. 必須開啟 buildConfig 功能
         buildConfig = true
     }
-
-//    composeOptions {
-//        kotlinCompilerExtensionVersion = "1.5.14"
-//    }
 }
 
 dependencies {
@@ -98,8 +94,6 @@ dependencies {
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation(libs.androidx.navigation.compose)
-    implementation(libs.google.material)
-    implementation(libs.androidx.compose.material3)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
