@@ -200,95 +200,78 @@ private fun NewsPreviewSection(onClick: () -> Unit) {
         }
 
         // 預覽卡面區
-        Card(
-            onClick = onClick,
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            shape = RoundedCornerShape(16.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-        ) {
-            Row(
-                modifier = Modifier.padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // 新聞小圖示
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(primaryColor.copy(alpha = 0.1f), RoundedCornerShape(8.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Newspaper, contentDescription = null, tint = primaryColor, modifier = Modifier.size(24.dp))
-                }
 
-                Spacer(modifier = Modifier.width(12.dp))
+        data class NewsPreview(
+            val title: String,
+            val summary: String,
+            val icon: ImageVector
+        )
 
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "【查核】網傳連結「填寫7-ELEVEN問卷調查可抽1萬元」？",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = onSurfaceColor,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = "近日網路流傳一個聲稱「7-ELEVEN問卷調查可抽1萬元」的網址...",
-                        fontSize = 13.sp,
-                        color = textGrey,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+        val newsPreviews = listOf(
+            NewsPreview(
+                title = "【查核】網傳連結「填寫7-ELEVEN問卷調查可抽1萬元」？",
+                summary = "近日網路流傳一個聲稱「7-ELEVEN問卷調查可抽1萬元」的網址...",
+                icon = Icons.Default.Newspaper
+            ),
+            NewsPreview(
+                title = "【165警訊】假買家騙賣家詐騙？",
+                summary = "在臉書上刊登出售球拍的廣告，就隨即有人聯繫表示想購買...",
+                icon = Icons.Default.DataThresholding
+            )
+        )
+
+        newsPreviews.forEachIndexed { index, preview ->
+            if (index > 0) {
+                Spacer(modifier = Modifier.height(10.dp))
             }
-        }
 
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Card(
-            onClick = onClick,
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            shape = RoundedCornerShape(16.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-        ) {
-            Row(
-                modifier = Modifier.padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
+            Card(
+                onClick = onClick,
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
-                // 趨勢小圖示
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(primaryColor.copy(alpha = 0.1f), RoundedCornerShape(8.dp)),
-                    contentAlignment = Alignment.Center
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        Icons.Default.DataThresholding,
-                        contentDescription = null,
-                        tint = primaryColor,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(
+                                primaryColor.copy(alpha = 0.1f),
+                                RoundedCornerShape(8.dp)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            preview.icon,
+                            contentDescription = null,
+                            tint = primaryColor,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
 
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "【165警訊】假買家騙賣家詐騙？",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = onSurfaceColor,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = "在臉書上刊登出售球拍的廣告，就隨即有人聯繫表示想購買...",
-                        fontSize = 13.sp,
-                        color = textGrey,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = preview.title,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = onSurfaceColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = preview.summary,
+                            fontSize = 13.sp,
+                            color = textGrey,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
         }

@@ -125,7 +125,7 @@ fun FraudResultScreen(originalText: String, result: ScanUiModel, onBack: () -> U
                     Text(statusText, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = statusColor)
                     Spacer(Modifier.height(8.dp))
 
-                    Text(if(result.score > 0) "風險指數" else "", color = textGrey, fontSize = 12.sp)
+                    Text(if (result.score > 0) "風險指數" else "", color = textGrey, fontSize = 12.sp)
                     Spacer(Modifier.height(16.dp))
 
                     if (result.score >= 0) {
@@ -147,7 +147,7 @@ fun FraudResultScreen(originalText: String, result: ScanUiModel, onBack: () -> U
                         }
                     }
 
-                    if(result.score >= 0) {
+                    if (result.score >= 0) {
                         Text("${result.score}%", color = textWhite, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
                     }
                 }

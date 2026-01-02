@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 修正：將父項改為系統內建的 NoActionBar 主題，不再依賴 Google Material Library -->
+    <!-- 修正：將父項改為系統內建的 DeviceDefault.NoActionBar 主題，不再依賴 Google Material Library -->
     <style name="Theme.ScamDetectorApp" parent="android:Theme.DeviceDefault.NoActionBar">
         <item name="android:windowBackground">@color/scam_background</item>
         <item name="android:statusBarColor">@color/scam_background</item>
